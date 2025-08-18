@@ -39,7 +39,7 @@ func (h Handler) RequestRouter(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		h.PostURL(w, r)
 	case http.MethodGet:
-		h.GetShortURLById(w, r)
+		h.GetShortURLByID(w, r)
 	default:
 		w.WriteHeader(http.StatusBadRequest)
 	}
@@ -67,7 +67,7 @@ func (h Handler) PostURL(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (h Handler) GetShortURLById(w http.ResponseWriter, r *http.Request) {
+func (h Handler) GetShortURLByID(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/" || r.URL.Path == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
