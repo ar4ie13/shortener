@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -60,8 +59,9 @@ func (h Handler) PostURL(w http.ResponseWriter, r *http.Request) {
 	}
 	host := "http://" + r.Host + "/" + id
 	w.WriteHeader(http.StatusCreated)
-	responseText := fmt.Sprintf("%s %d Created\nContent-Type: %s\nContent-Length: %d\n\n%s", r.Proto, http.StatusCreated, r.Header.Get("Content-Type"), len(host), host)
-	if _, err := w.Write([]byte(responseText)); err != nil {
+	//TODO: remove when autotests will be completed successfully
+	//responseText := fmt.Sprintf("%s %d Created\nContent-Type: %s\nContent-Length: %d\n\n%s", r.Proto, http.StatusCreated, r.Header.Get("Content-Type"), len(host), host)
+	if _, err := w.Write([]byte(host)); err != nil {
 		log.Println(err)
 	}
 
@@ -79,9 +79,13 @@ func (h Handler) GetShortURLById(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	w.WriteHeader(http.StatusTemporaryRedirect)
+	/*TODO: remove when autotests will be completed successfully
+		w.WriteHeader(http.StatusTemporaryRedirect)
 	responseText := fmt.Sprintf("%s %d Temporary Redirect\n\nLocation: %s", r.Proto, http.StatusTemporaryRedirect, url)
-	if _, err := w.Write([]byte(responseText)); err != nil {
+	if _, err := w.Write([]byte("Location: " + url)); err != nil {
 		log.Println(err)
 	}
+	*/
+	w.Header().Set("Location", url)
+	w.WriteHeader(http.StatusTemporaryRedirect)
 }
