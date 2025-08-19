@@ -26,7 +26,7 @@ func NewHandler(s Service) *Handler {
 
 func (h Handler) ListenAndServe() error {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", h.RequestRouter)
+	mux.HandleFunc("/", h.requestRouter)
 	if err := http.ListenAndServe(ServerAddr, mux); err != nil {
 		return err
 	}
@@ -34,18 +34,18 @@ func (h Handler) ListenAndServe() error {
 	return nil
 }
 
-func (h Handler) RequestRouter(w http.ResponseWriter, r *http.Request) {
+func (h Handler) requestRouter(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
-		h.PostURL(w, r)
+		h.postURL(w, r)
 	case http.MethodGet:
-		h.GetShortURLByID(w, r)
+		h.getShortURLByID(w, r)
 	default:
 		w.WriteHeader(http.StatusBadRequest)
 	}
 }
 
-func (h Handler) PostURL(w http.ResponseWriter, r *http.Request) {
+func (h Handler) postURL(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil || len(body) == 0 {
 		w.WriteHeader(http.StatusBadRequest)
@@ -65,7 +65,7 @@ func (h Handler) PostURL(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (h Handler) GetShortURLByID(w http.ResponseWriter, r *http.Request) {
+func (h Handler) getShortURLByID(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/" || r.URL.Path == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
