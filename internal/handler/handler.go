@@ -12,7 +12,7 @@ const (
 )
 
 type Service interface {
-	Get(id string) (string, error)
+	GetURL(id string) (string, error)
 	GenerateShortURL(url string) (string, error)
 }
 
@@ -27,6 +27,7 @@ func NewHandler(s Service) *Handler {
 func (h Handler) ListenAndServe() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", h.requestRouter)
+
 	if err := http.ListenAndServe(ServerAddr, mux); err != nil {
 		return err
 	}
@@ -59,10 +60,9 @@ func (h Handler) postURL(w http.ResponseWriter, r *http.Request) {
 	}
 	host := "http://" + r.Host + "/" + id
 	w.WriteHeader(http.StatusCreated)
-	if _, err := w.Write([]byte(host)); err != nil {
+	if _, err = w.Write([]byte(host)); err != nil {
 		log.Println(err)
 	}
-
 }
 
 func (h Handler) getShortURLByID(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +71,7 @@ func (h Handler) getShortURLByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := strings.TrimLeft(r.URL.Path, "/")
-	url, err := h.s.Get(id)
+	url, err := h.s.GetURL(id)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		log.Println(err)

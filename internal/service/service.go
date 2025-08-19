@@ -28,7 +28,7 @@ func NewService(r Repository) *Service {
 	return &Service{r}
 }
 
-func (s Service) Get(id string) (string, error) {
+func (s Service) GetURL(id string) (string, error) {
 	id, err := s.r.Get(id)
 	if err != nil {
 		return "", err
