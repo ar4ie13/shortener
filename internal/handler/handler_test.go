@@ -47,6 +47,7 @@ func TestRequestRouter(t *testing.T) {
 			h := http.HandlerFunc(hnd.requestRouter)
 			h(w, r)
 			resp := w.Result()
+			defer resp.Body.Close()
 			assert.Equal(t, tt.want.status, resp.StatusCode)
 
 		})
@@ -77,7 +78,7 @@ func (m *MockService) GenerateShortURL(url string) (string, error) {
 	if m.err != nil {
 		return "", m.err
 	}
-	for key, _ := range m.urlLib {
+	for key := range m.urlLib {
 		if m.urlLib[key] == url {
 			return "", errors.New("url already exists")
 		}
@@ -236,6 +237,9 @@ func TestPostURL(t *testing.T) {
 			}
 
 			body, err := io.ReadAll(rr.Body)
+			if err != nil {
+				t.Fatalf("Failed to read response body: %v", err)
+			}
 
 			// Check body for valid case
 			if tt.expectedBody != string(body) {
