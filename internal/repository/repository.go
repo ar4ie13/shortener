@@ -1,16 +1,18 @@
 package repository
 
 import (
-	"fmt"
 	"github.com/ar4ie13/shortener/internal/service"
 )
 
+// urlLib is used for storing the map id(shortURL):URL
 type urlLib map[string]string
 
+// Repository is the main object for the package repository
 type Repository struct {
 	urlLib
 }
 
+// NewRepository is a contructor for Repository object
 func NewRepository() *Repository {
 
 	return &Repository{
@@ -18,6 +20,7 @@ func NewRepository() *Repository {
 	}
 }
 
+// Get method is used to get URL (link) from the repository map
 func (repo *Repository) Get(id string) (string, error) {
 	if link, ok := repo.urlLib[id]; ok {
 		return link, nil
@@ -26,6 +29,7 @@ func (repo *Repository) Get(id string) (string, error) {
 	return "", service.ErrNotFound
 }
 
+// exists check the existance of URL in the map
 func (repo *Repository) exists(url string) bool {
 	for _, v := range repo.urlLib {
 		if v == url {
@@ -36,12 +40,12 @@ func (repo *Repository) exists(url string) bool {
 	return false
 }
 
+// Save saves the id(shortURL):URL pair in the map
 func (repo *Repository) Save(id string, url string) error {
 	if repo.exists(url) {
 		return service.ErrURLExist
 	}
 	repo.urlLib[id] = url
-	fmt.Println(repo.urlLib)
 
 	return nil
 }
