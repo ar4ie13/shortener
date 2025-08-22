@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"github.com/go-chi/chi/v5"
 	"io"
 	"log"
 	"net/http"
@@ -27,28 +28,19 @@ func NewHandler(s Service) *Handler {
 	return &Handler{s}
 }
 
-// ListenAndServe starts web server
+// ListenAndServe starts web server with specified chi router
 func (h Handler) ListenAndServe() error {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", h.requestRouter)
+	router := chi.NewRouter()
+	router.Route("/", func(router chi.Router) {
+		router.Post("/", h.postURL)
+		router.Get("/{id}", h.getShortURLByID)
+	})
 
-	if err := http.ListenAndServe(ServerAddr, mux); err != nil {
+	if err := http.ListenAndServe(ServerAddr, router); err != nil {
 		return err
 	}
 
 	return nil
-}
-
-// requestRouter routes incoming requests
-func (h Handler) requestRouter(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPost:
-		h.postURL(w, r)
-	case http.MethodGet:
-		h.getShortURLByID(w, r)
-	default:
-		w.WriteHeader(http.StatusBadRequest)
-	}
 }
 
 // postURL handles POST requests from clients and receives URL from body to store it in the Repository via Service

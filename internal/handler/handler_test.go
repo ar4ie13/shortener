@@ -2,57 +2,12 @@ package handler
 
 import (
 	"errors"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 )
-
-// TestHandler_requestRouter checks that router don't allow other methods than GET and POST, returning Bad Request response
-func TestRequestRouter(t *testing.T) {
-	type want struct {
-		method string
-		status int
-		url    string
-	}
-
-	tests := []struct {
-		name string
-		want want
-	}{
-		{
-			name: "PUT check",
-			want: want{
-				method: http.MethodPut,
-				status: http.StatusBadRequest,
-				url:    "/",
-			},
-		},
-		{
-			name: "DELETE check",
-			want: want{
-				method: http.MethodDelete,
-				status: http.StatusBadRequest,
-				url:    "/",
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			hnd := &Handler{}
-			r := httptest.NewRequest(tt.want.method, tt.want.url, nil)
-			w := httptest.NewRecorder()
-			h := http.HandlerFunc(hnd.requestRouter)
-			h(w, r)
-			resp := w.Result()
-			defer resp.Body.Close()
-			assert.Equal(t, tt.want.status, resp.StatusCode)
-
-		})
-	}
-}
 
 // This part will test two main handlers for POST and GET methods
 // MockService mocks the Service interface for testing
