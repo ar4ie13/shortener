@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -106,7 +107,8 @@ func TestGetShortURLByID(t *testing.T) {
 
 			// Call handler
 			handler.getShortURLByID(rr, req)
-
+			fmt.Println(tt.name, mockService.urlLib)
+			fmt.Println(req.URL)
 			// Check status code
 			if rr.Code != tt.expectedStatus {
 				t.Errorf("Expected status %d, got %d", tt.expectedStatus, rr.Code)

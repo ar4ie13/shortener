@@ -31,6 +31,7 @@ func NewHandler(s Service) *Handler {
 // ListenAndServe starts web server with specified chi router
 func (h Handler) ListenAndServe() error {
 	router := chi.NewRouter()
+	//router.Use(middleware.Logger)
 	router.Route("/", func(router chi.Router) {
 		router.Post("/", h.postURL)
 		router.Get("/{id}", h.getShortURLByID)
