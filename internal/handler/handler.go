@@ -9,24 +9,26 @@ import (
 	"strings"
 )
 
-const (
-	ServerAddr = "localhost:8080"
-)
-
 // Service interface interacts with service package
 type Service interface {
 	GetURL(id string) (string, error)
 	GenerateShortURL(url string) (string, error)
 }
 
+type Config interface {
+	GetLocalServerAddr() string
+	GetShortURLTemplate() string
+}
+
 // Handler is a main object for package handler
 type Handler struct {
 	s Service
+	c Config
 }
 
 // NewHandler constructs Handler object
-func NewHandler(s Service) *Handler {
-	return &Handler{s}
+func NewHandler(s Service, c Config) *Handler {
+	return &Handler{s, c}
 }
 
 // ListenAndServe starts web server with specified chi router
@@ -37,8 +39,8 @@ func (h Handler) ListenAndServe() error {
 		router.Post("/", h.postURL)
 		router.Get("/{id}", h.getShortURLByID)
 	})
-
-	if err := http.ListenAndServe(ServerAddr, router); err != nil {
+	log.Println("Listening on", h.c.GetLocalServerAddr())
+	if err := http.ListenAndServe(h.c.GetLocalServerAddr(), router); err != nil {
 		return err
 	}
 
@@ -62,7 +64,7 @@ func (h Handler) postURL(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	host := "http://" + ServerAddr + "/" + id
+	host := h.c.GetShortURLTemplate() + "/" + id
 	w.WriteHeader(http.StatusCreated)
 	if _, err = w.Write([]byte(host)); err != nil {
 		log.Println(err)
