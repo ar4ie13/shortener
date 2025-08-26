@@ -11,6 +11,22 @@ import (
 
 // This part will test two main handlers for POST and GET methods
 // MockService mocks the Service interface for testing
+
+type MockConfig struct {
+	LocalServerAddr  string
+	ShortURLTemplate string
+}
+
+func (c *MockConfig) GetLocalServerAddr() string {
+	c.LocalServerAddr = "localhost:8080"
+	return c.LocalServerAddr
+}
+
+func (c *MockConfig) GetShortURLTemplate() string {
+	c.ShortURLTemplate = "http://localhost:8080"
+	return c.ShortURLTemplate
+}
+
 type MockService struct {
 	urlLib map[string]string
 	err    error
@@ -93,7 +109,8 @@ func TestGetShortURLByID(t *testing.T) {
 				urlLib: tt.storageURLs,
 				err:    tt.storageErr,
 			}
-			handler := NewHandler(mockService)
+			mockConfig := &MockConfig{}
+			handler := NewHandler(mockService, mockConfig)
 
 			// Create HTTP request
 			req, err := http.NewRequest(http.MethodGet, tt.path, nil)
@@ -171,7 +188,8 @@ func TestPostURL(t *testing.T) {
 				urlLib: tt.storageURLs,
 				err:    tt.storageErr,
 			}
-			handler := NewHandler(mockService)
+			mockConfig := &MockConfig{}
+			handler := NewHandler(mockService, mockConfig)
 
 			// Create HTTP request
 			req, err := http.NewRequest(http.MethodPost, tt.path, strings.NewReader(tt.body))
