@@ -15,6 +15,7 @@ type Service interface {
 	GenerateShortURL(url string) (string, error)
 }
 
+// Config interface gets configuration flags from config package
 type Config interface {
 	GetLocalServerAddr() string
 	GetShortURLTemplate() string

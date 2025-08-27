@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"github.com/ar4ie13/shortener/internal/config"
 	"github.com/ar4ie13/shortener/internal/handler"
 	"github.com/ar4ie13/shortener/internal/repository"
@@ -18,7 +17,6 @@ func main() {
 func run() error {
 	cfg := config.NewConfig()
 	cfg.InitConfig()
-	flag.Parse()
 
 	repo := repository.NewRepository()
 	srv := service.NewService(repo)

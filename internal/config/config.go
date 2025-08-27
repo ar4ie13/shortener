@@ -61,6 +61,7 @@ func (c *Config) InitConfig() {
 
 	flag.Var(&c.ShortURLTemplate, "b", "short url template")
 
+	flag.Parse()
 }
 
 func (c *Config) GetLocalServerAddr() string {
