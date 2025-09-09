@@ -109,7 +109,9 @@ func TestGetShortURLByID(t *testing.T) {
 				urlLib: tt.storageURLs,
 				err:    tt.storageErr,
 			}
-			mockConfig := &MockConfig{}
+			mockConfig := &MockConfig{
+				LocalServerAddr: "localhost:8080",
+			}
 			handler := NewHandler(mockService, mockConfig)
 
 			// Create HTTP request

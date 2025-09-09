@@ -3,18 +3,31 @@ package config
 import (
 	"flag"
 	"fmt"
+	"log"
 	"net/url"
-	"os"
 )
 
-type ShortURL string
+// ShortURLTemplate type for short URL template flag
+type ShortURLTemplate string
 
-func (u *ShortURL) String() string {
+// Config struct used for program flag variables
+type Config struct {
+	LocalServerAddr  string
+	ShortURLTemplate ShortURLTemplate
+}
+
+// NewConfig constructor for Config
+func NewConfig() *Config {
+	return &Config{}
+}
+
+// String return short URL in string format
+func (u *ShortURLTemplate) String() string {
 	return string(*u)
 }
 
 // Set validates and sets the flag value
-func (u *ShortURL) Set(value string) error {
+func (u *ShortURLTemplate) Set(value string) error {
 	// Check if the value is empty
 	if value == "" {
 		return fmt.Errorf("URL template cannot be empty")
@@ -36,27 +49,17 @@ func (u *ShortURL) Set(value string) error {
 		return fmt.Errorf("URL template must include a host")
 	}
 
-	*u = ShortURL(value)
+	*u = ShortURLTemplate(value)
 	return nil
 }
 
-// Config struct used for program flag variables
-type Config struct {
-	LocalServerAddr  string
-	ShortURLTemplate ShortURL
-}
-
-func NewConfig() *Config {
-	return &Config{}
-}
-
+// InitConfig initialize configuration
 func (c *Config) InitConfig() {
 	flag.StringVar(&c.LocalServerAddr, "a", "localhost:8080", "local server address")
 
 	defaultURL := "http://localhost:8080"
 	if err := c.ShortURLTemplate.Set(defaultURL); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to set default URL: %v\n", err)
-		os.Exit(1)
+		log.Fatalf("Failed to set default URL: %v\n", err)
 	}
 
 	flag.Var(&c.ShortURLTemplate, "b", "short url template")
@@ -64,11 +67,13 @@ func (c *Config) InitConfig() {
 	flag.Parse()
 }
 
+// GetLocalServerAddr returns localserver address string
 func (c *Config) GetLocalServerAddr() string {
 
 	return c.LocalServerAddr
 }
 
+// GetShortURLTemplate returns Short URL template string
 func (c *Config) GetShortURLTemplate() string {
 	return string(c.ShortURLTemplate)
 }

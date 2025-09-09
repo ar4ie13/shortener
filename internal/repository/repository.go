@@ -29,7 +29,7 @@ func (repo *Repository) Get(id string) (string, error) {
 	return "", service.ErrNotFound
 }
 
-// exists check the existance of URL in the map
+// exists check if URL exist in the map
 func (repo *Repository) exists(url string) bool {
 	for _, v := range repo.urlLib {
 		if v == url {
@@ -42,6 +42,9 @@ func (repo *Repository) exists(url string) bool {
 
 // Save saves the id(shortURL):URL pair in the map
 func (repo *Repository) Save(id string, url string) error {
+	if id == "" || url == "" {
+		return service.ErrInvalidIDorURL
+	}
 	if repo.exists(url) {
 		return service.ErrURLExist
 	}
