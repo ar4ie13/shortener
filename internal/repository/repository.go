@@ -45,9 +45,11 @@ func (repo *Repository) Save(id string, url string) error {
 	if id == "" || url == "" {
 		return service.ErrInvalidIDorURL
 	}
+
 	if repo.exists(url) {
 		return service.ErrURLExist
 	}
+
 	repo.urlLib[id] = url
 
 	return nil

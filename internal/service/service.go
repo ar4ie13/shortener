@@ -44,6 +44,7 @@ func (s Service) GetURL(id string) (string, error) {
 	if id == "" {
 		return "", ErrEmptyID
 	}
+	
 	id, err := s.r.Get(id)
 	if err != nil {
 
@@ -74,10 +75,12 @@ func (s Service) GenerateShortURL(urlLink string) (string, error) {
 	if parsedURL.Host == "" {
 		return "", ErrMustIncludeHost
 	}
+
 	id, err := generateShortURL(shortURLLen)
 	if err != nil {
 		return "", err
 	}
+
 	if err = s.r.Save(id, urlLink); err != nil {
 		return id, err
 	}
@@ -90,6 +93,7 @@ func generateShortURL(length int) (string, error) {
 	if length <= 0 {
 		return "", ErrShortURLLength
 	}
+
 	shortURL := make([]byte, length)
 	for i := range shortURL {
 		shortURL[i] = randGenerateSymbols[rand.Intn(len(randGenerateSymbols))]
