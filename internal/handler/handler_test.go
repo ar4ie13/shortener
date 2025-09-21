@@ -146,7 +146,7 @@ func TestGetShortURLByID(t *testing.T) {
 			ts := httptest.NewServer(router)
 			defer ts.Close()
 			resp, _ := testRequest(t, ts, "GET", tt.path)
-
+			defer resp.Body.Close()
 			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
 			assert.Equal(t, tt.expectedHeader, resp.Header.Get("Location"))
 
