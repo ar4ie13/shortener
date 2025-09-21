@@ -2,7 +2,7 @@ package repository
 
 import (
 	"errors"
-	"github.com/ar4ie13/shortener/internal/service"
+	"fmt"
 	"testing"
 )
 
@@ -72,7 +72,7 @@ func TestRepository_Get(t *testing.T) {
 			},
 			want:      "",
 			wantErr:   true,
-			wantError: service.ErrNotFound,
+			wantError: ErrNotFound,
 		},
 		{
 			name: "Empty input parameter",
@@ -86,7 +86,7 @@ func TestRepository_Get(t *testing.T) {
 			},
 			want:      "",
 			wantErr:   true,
-			wantError: service.ErrNotFound,
+			wantError: ErrNotFound,
 		},
 	}
 	for _, tt := range tests {
@@ -108,6 +108,7 @@ func TestRepository_Get(t *testing.T) {
 }
 
 func TestRepository_Save(t *testing.T) {
+
 	type fields struct {
 		urlLib urlLib
 	}
@@ -148,7 +149,7 @@ func TestRepository_Save(t *testing.T) {
 				url: "https://example.com",
 			},
 			wantErr:     true,
-			wantErrName: service.ErrURLExist,
+			wantErrName: ErrURLExist,
 		},
 		{
 			name: "Empty ID and existent URL",
@@ -162,7 +163,7 @@ func TestRepository_Save(t *testing.T) {
 				url: "https://example.com",
 			},
 			wantErr:     true,
-			wantErrName: service.ErrInvalidIDorURL,
+			wantErrName: ErrEmptyIDorURL,
 		},
 		{
 			name: "Valid ID and empty URL",
@@ -176,7 +177,7 @@ func TestRepository_Save(t *testing.T) {
 				url: "",
 			},
 			wantErr:     true,
-			wantErrName: service.ErrInvalidIDorURL,
+			wantErrName: ErrEmptyIDorURL,
 		},
 	}
 	for _, tt := range tests {
@@ -184,7 +185,9 @@ func TestRepository_Save(t *testing.T) {
 			repo := &Repository{
 				urlLib: tt.fields.urlLib,
 			}
+
 			if err := repo.Save(tt.args.id, tt.args.url); (err != nil) != tt.wantErr || !errors.Is(err, tt.wantErrName) {
+				fmt.Println(err, tt.wantErrName)
 				t.Errorf("Save() error = %s, wantErr %s", err, tt.wantErrName)
 			}
 		})

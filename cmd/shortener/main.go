@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/ar4ie13/shortener/internal/config"
 	"github.com/ar4ie13/shortener/internal/handler"
 	"github.com/ar4ie13/shortener/internal/repository"
@@ -16,14 +17,12 @@ func main() {
 
 func run() error {
 	cfg := config.NewConfig()
-	cfg.InitConfig()
-
 	repo := repository.NewRepository()
 	srv := service.NewService(repo)
 	hdlr := handler.NewHandler(srv, cfg)
 
 	if err := hdlr.ListenAndServe(); err != nil {
-		return err
+		return fmt.Errorf("shortener service error: %w", err)
 	}
 
 	return nil

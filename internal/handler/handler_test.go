@@ -2,6 +2,9 @@ package handler
 
 import (
 	"errors"
+	"github.com/go-chi/chi/v5"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -58,6 +61,27 @@ func (m *MockService) GenerateShortURL(url string) (string, error) {
 	return "abc123", nil
 }
 
+func testRequest(t *testing.T, ts *httptest.Server, method,
+	path string) (*http.Response, string) {
+	req, err := http.NewRequest(method, ts.URL+path, nil)
+	require.NoError(t, err)
+
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse // Prevents automatic redirects
+		},
+	}
+
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	return resp, string(respBody)
+}
+
 func TestGetShortURLByID(t *testing.T) {
 	// Test cases
 	tests := []struct {
@@ -73,7 +97,7 @@ func TestGetShortURLByID(t *testing.T) {
 			path:           "",
 			storageURLs:    map[string]string{},
 			storageErr:     nil,
-			expectedStatus: http.StatusBadRequest,
+			expectedStatus: http.StatusMethodNotAllowed,
 			expectedHeader: "",
 		},
 		{
@@ -81,7 +105,7 @@ func TestGetShortURLByID(t *testing.T) {
 			path:           "/",
 			storageURLs:    map[string]string{},
 			storageErr:     nil,
-			expectedStatus: http.StatusBadRequest,
+			expectedStatus: http.StatusMethodNotAllowed,
 			expectedHeader: "",
 		},
 		{
@@ -112,33 +136,20 @@ func TestGetShortURLByID(t *testing.T) {
 			mockConfig := &MockConfig{
 				LocalServerAddr: "localhost:8080",
 			}
-			handler := NewHandler(mockService, mockConfig)
+			h := NewHandler(mockService, mockConfig)
 
-			// Create HTTP request
-			req, err := http.NewRequest(http.MethodGet, tt.path, nil)
-			if err != nil {
-				t.Fatalf("Failed to create request: %v", err)
-			}
+			router := chi.NewRouter()
+			router.Route("/", func(router chi.Router) {
+				router.Post("/", h.postURL)
+				router.Get("/{id}", h.getShortURLByID)
+			})
+			ts := httptest.NewServer(router)
+			defer ts.Close()
+			resp, _ := testRequest(t, ts, "GET", tt.path)
 
-			// Create response recorder
-			rr := httptest.NewRecorder()
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+			assert.Equal(t, tt.expectedHeader, resp.Header.Get("Location"))
 
-			// Call handler
-			handler.getShortURLByID(rr, req)
-			// Check status code
-			if rr.Code != tt.expectedStatus {
-				t.Errorf("Expected status %d, got %d", tt.expectedStatus, rr.Code)
-			}
-
-			// Check Location header for valid case
-			if tt.expectedHeader != "" {
-				location := rr.Header().Get("Location")
-				if location != tt.expectedHeader {
-					t.Errorf("Expected Location header %q, got %q", tt.expectedHeader, location)
-				}
-			} else if rr.Header().Get("Location") != "" {
-				t.Errorf("Expected no Location header, got %q", rr.Header().Get("Location"))
-			}
 		})
 	}
 }
@@ -157,11 +168,11 @@ func TestPostURL(t *testing.T) {
 		{
 			name:           "Empty path",
 			path:           "",
-			storageURLs:    map[string]string{},
+			storageURLs:    map[string]string{"a123": "https://example.com"},
 			storageErr:     nil,
-			body:           "www.ya.ru",
-			expectedStatus: http.StatusBadRequest,
-			expectedBody:   "",
+			body:           "https://ya.com",
+			expectedStatus: http.StatusCreated,
+			expectedBody:   "http://localhost:8080/abc123",
 		},
 		{
 			name:           "Positive POST request",
@@ -178,7 +189,7 @@ func TestPostURL(t *testing.T) {
 			storageURLs:    map[string]string{"abc123": "www.ya.ru"},
 			storageErr:     errors.New("id already exists"),
 			body:           "www.ya.ru",
-			expectedStatus: http.StatusBadRequest,
+			expectedStatus: http.StatusInternalServerError,
 			expectedBody:   "",
 		},
 	}

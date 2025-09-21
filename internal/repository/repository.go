@@ -1,7 +1,14 @@
 package repository
 
 import (
-	"github.com/ar4ie13/shortener/internal/service"
+	"errors"
+)
+
+var (
+	ErrNotFound     = errors.New("not found")
+	ErrURLExist     = errors.New("URL already exist")
+	ErrEmptyIDorURL = errors.New("ID or URL cannot be empty")
+	ErrIDExist      = errors.New("ID already exist")
 )
 
 // urlLib is used for storing the map id(shortURL):URL
@@ -12,9 +19,8 @@ type Repository struct {
 	urlLib
 }
 
-// NewRepository is a contructor for Repository object
+// NewRepository is a constructor for Repository object
 func NewRepository() *Repository {
-
 	return &Repository{
 		urlLib: make(map[string]string),
 	}
@@ -26,7 +32,7 @@ func (repo *Repository) Get(id string) (string, error) {
 		return link, nil
 	}
 
-	return "", service.ErrNotFound
+	return "", ErrNotFound
 }
 
 // exists check if URL exist in the map
@@ -43,11 +49,14 @@ func (repo *Repository) exists(url string) bool {
 // Save saves the id(shortURL):URL pair in the map
 func (repo *Repository) Save(id string, url string) error {
 	if id == "" || url == "" {
-		return service.ErrInvalidIDorURL
+		return ErrEmptyIDorURL
+	}
+	if repo.exists(url) {
+		return ErrURLExist
 	}
 
-	if repo.exists(url) {
-		return service.ErrURLExist
+	if _, ok := repo.urlLib[id]; ok {
+		return ErrIDExist
 	}
 
 	repo.urlLib[id] = url

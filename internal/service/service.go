@@ -3,19 +3,19 @@ package service
 import (
 	"errors"
 	"fmt"
+	"github.com/ar4ie13/shortener/internal/repository"
 	"math/rand"
 	"net/url"
 )
 
 var (
-	ErrNotFound        = errors.New("not found")
-	ErrURLExist        = errors.New("URL already exist")
-	ErrInvalidIDorURL  = errors.New("invalid ID or URL")
-	ErrEmptyURL        = errors.New("URL template cannot be empty")
-	ErrWrongHTTPScheme = errors.New("URL template must use http or https scheme")
-	ErrMustIncludeHost = errors.New("URL template must include a host")
-	ErrEmptyID         = errors.New("short url cannot be empty")
-	ErrShortURLLength  = errors.New("short url length is too small")
+	ErrEmptyURL         = errors.New("URL template cannot be empty")
+	ErrWrongHTTPScheme  = errors.New("URL template must use http or https scheme")
+	ErrMustIncludeHost  = errors.New("URL template must include a host")
+	ErrInvalidURLFormat = errors.New("invalid URL format")
+
+	errEmptyID        = errors.New("short url cannot be empty")
+	errShortURLLength = errors.New("short url length is too small")
 )
 
 const (
@@ -42,20 +42,21 @@ func NewService(r Repository) *Service {
 // GetURL method gets URL by provided id
 func (s Service) GetURL(id string) (string, error) {
 	if id == "" {
-		return "", ErrEmptyID
+		return "", errEmptyID
 	}
-	
-	id, err := s.r.Get(id)
+
+	idURL, err := s.r.Get(id)
 	if err != nil {
-
-		return "", err
+		if errors.Is(err, repository.ErrNotFound) || errors.Is(err, repository.ErrEmptyIDorURL) {
+			return "", fmt.Errorf("failed to get URL: %w", err)
+		}
 	}
 
-	return id, nil
+	return idURL, nil
 }
 
 // GenerateShortURL generates shortURL for non-existent URL and stores it in the Repository
-func (s Service) GenerateShortURL(urlLink string) (string, error) {
+func (s Service) GenerateShortURL(urlLink string) (slug string, err error) {
 	if urlLink == "" {
 		return "", ErrEmptyURL
 	}
@@ -63,7 +64,7 @@ func (s Service) GenerateShortURL(urlLink string) (string, error) {
 	// Validate the URL format
 	parsedURL, err := url.Parse(urlLink)
 	if err != nil {
-		return "", fmt.Errorf("invalid URL format: %v", err)
+		return "", ErrInvalidURLFormat
 	}
 
 	// Ensure the scheme is http or https
@@ -76,22 +77,39 @@ func (s Service) GenerateShortURL(urlLink string) (string, error) {
 		return "", ErrMustIncludeHost
 	}
 
-	id, err := generateShortURL(shortURLLen)
-	if err != nil {
-		return "", err
-	}
+	for attempt := 1; attempt <= 3; attempt++ {
+		slug, err = generateShortURL(shortURLLen)
 
-	if err = s.r.Save(id, urlLink); err != nil {
-		return id, err
-	}
+		if err != nil {
+			if attempt == 3 {
+				return "", err
+			}
+			continue
+		}
 
-	return id, nil
+		err = s.r.Save(slug, urlLink)
+
+		if err == nil {
+			return slug, nil
+		}
+
+		if errors.Is(err, repository.ErrURLExist) {
+			return "", err
+		}
+
+		if attempt == 3 {
+			if errors.Is(err, repository.ErrIDExist) {
+				return "", fmt.Errorf("failed to save URL to repository: %w", err)
+			}
+		}
+	}
+	return "", err
 }
 
 // generateShortURL is a sub-function for GenerateShortURL
 func generateShortURL(length int) (string, error) {
 	if length <= 0 {
-		return "", ErrShortURLLength
+		return "", errShortURLLength
 	}
 
 	shortURL := make([]byte, length)

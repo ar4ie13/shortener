@@ -5,19 +5,6 @@ import (
 	"testing"
 )
 
-func TestNewConfig(t *testing.T) {
-	cfg := NewConfig()
-	if cfg == nil {
-		t.Error("NewConfig() returned nil")
-	}
-	if cfg != nil && cfg.LocalServerAddr != "" {
-		t.Errorf("NewConfig() LocalServerAddr expected empty, got %q", cfg.LocalServerAddr)
-	}
-	if cfg != nil && cfg.ShortURLTemplate != "" {
-		t.Errorf("NewConfig() ShortURLTemplate expected empty, got %q", cfg.ShortURLTemplate)
-	}
-}
-
 func TestShortURLTemplate_Set(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -176,23 +163,35 @@ func TestShortURLTemplate_String(t *testing.T) {
 
 }
 
-func TestConfig_InitConfig(t *testing.T) {
+func TestNewConfig(t *testing.T) {
 	tests := []struct {
 		name     string
-		cfg      *Config
-		expected string
+		expected struct {
+			localAddr string
+			shortURL  string
+		}
 	}{
 		{
-			name:     "default config",
-			cfg:      &Config{},
-			expected: "localhost:8080",
+			name: "default config",
+			expected: struct {
+				localAddr string
+				shortURL  string
+			}{
+				localAddr: "localhost:8080",
+				shortURL:  "http://localhost:8080"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.cfg.InitConfig()
-			if tt.cfg.LocalServerAddr != tt.expected {
-				t.Errorf("InitConfig() expected %q, got %q", tt.expected, tt.cfg.LocalServerAddr)
+			cfg := NewConfig()
+
+			if cfg.LocalServerAddr != tt.expected.localAddr {
+				t.Errorf("InitConfig() expected %q, got %q", tt.expected.localAddr, cfg.LocalServerAddr)
+
+			}
+
+			if string(cfg.ShortURLTemplate) != tt.expected.shortURL {
+				t.Errorf("InitConfig() expected %q, got %q", tt.expected.shortURL, cfg.ShortURLTemplate)
 
 			}
 

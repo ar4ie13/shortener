@@ -1,10 +1,17 @@
 package config
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"net/url"
+)
+
+var (
+	errEmptyURL        = errors.New("URL template cannot be empty")
+	errWrongHTTPScheme = errors.New("URL template must use http or https scheme")
+	errMustIncludeHost = errors.New("URL template must include a host")
 )
 
 // ShortURLTemplate type for short URL template flag
@@ -18,7 +25,9 @@ type Config struct {
 
 // NewConfig constructor for Config
 func NewConfig() *Config {
-	return &Config{}
+	c := &Config{}
+	c.InitConfig()
+	return c
 }
 
 // String return short URL in string format
@@ -30,7 +39,7 @@ func (u *ShortURLTemplate) String() string {
 func (u *ShortURLTemplate) Set(value string) error {
 	// Check if the value is empty
 	if value == "" {
-		return fmt.Errorf("URL template cannot be empty")
+		return errEmptyURL
 	}
 
 	// Validate the URL format
@@ -41,12 +50,12 @@ func (u *ShortURLTemplate) Set(value string) error {
 
 	// Ensure the scheme is http or https
 	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-		return fmt.Errorf("URL template must use http or https scheme")
+		return errWrongHTTPScheme
 	}
 
 	// Ensure the host is not empty
 	if parsedURL.Host == "" {
-		return fmt.Errorf("URL template must include a host")
+		return errMustIncludeHost
 	}
 
 	*u = ShortURLTemplate(value)
