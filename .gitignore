@@ -1,2 +1,4 @@
 coverage.out
 cmd/client
+.idea/golinter.xml
+.idea/inspectionProfiles
