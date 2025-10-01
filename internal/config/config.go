@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"os"
 )
 
 var (
@@ -74,6 +75,17 @@ func (c *Config) InitConfig() {
 	flag.Var(&c.ShortURLTemplate, "b", "short url template")
 
 	flag.Parse()
+
+	if serverAddr := os.Getenv("SERVER_ADDRESS"); serverAddr != "" {
+		c.LocalServerAddr = serverAddr
+	}
+
+	if baseURL := os.Getenv("BASE_URL"); baseURL != "" {
+		err := c.ShortURLTemplate.Set(baseURL)
+		if err != nil {
+			log.Fatalf("Failed to set short URL template: %v\n", err)
+		}
+	}
 }
 
 // GetLocalServerAddr returns localserver address string

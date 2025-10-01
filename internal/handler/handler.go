@@ -41,7 +41,7 @@ func (h Handler) ListenAndServe() error {
 		router.Post("/", h.postURL)
 		router.Get("/{id}", h.getShortURLByID)
 	})
-	log.Printf("Listening on %v", h.c.GetLocalServerAddr())
+	log.Printf("Listening on %v\nURL Template: %v", h.c.GetLocalServerAddr(), h.c.GetShortURLTemplate())
 	if err := http.ListenAndServe(h.c.GetLocalServerAddr(), router); err != nil {
 		return err
 	}
