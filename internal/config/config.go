@@ -93,7 +93,7 @@ func (c *Config) InitConfig() {
 
 	defaultServerAddr := "localhost:8080"
 	defaultURL := "http://localhost:8080"
-	defaultLogLevel := LogLevel{Level: zerolog.InfoLevel}
+	defaultLogLevel := LogLevel{Level: zerolog.ErrorLevel}
 
 	flag.StringVar(&c.LocalServerAddr, "a", defaultServerAddr, "local server address")
 	flag.Var(&c.ShortURLTemplate, "b", "short url template")
