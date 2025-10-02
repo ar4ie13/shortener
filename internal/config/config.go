@@ -144,6 +144,7 @@ func (c *Config) GetShortURLTemplate() string {
 	return string(c.ShortURLTemplate)
 }
 
+// GetLogLevel returns logging level. Used in logger.NewLogger constructor.
 func (c *Config) GetLogLevel() zerolog.Level {
 	return c.LogLevel.Level
 }

@@ -2,7 +2,6 @@ package handler
 
 import (
 	"errors"
-	"github.com/ar4ie13/shortener/internal/logger"
 	"github.com/ar4ie13/shortener/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
@@ -26,26 +25,25 @@ type Config interface {
 
 // Handler is a main object for package handler
 type Handler struct {
-	s Service
-	c Config
+	s    Service
+	c    Config
+	zlog zerolog.Logger
 }
 
 // NewHandler constructs Handler object
-func NewHandler(s Service, c Config) *Handler {
-	return &Handler{s, c}
+func NewHandler(s Service, c Config, zlog zerolog.Logger) *Handler {
+	return &Handler{s, c, zlog}
 }
 
 // ListenAndServe starts web server with specified chi router
 func (h Handler) ListenAndServe() error {
-	zlog := logger.NewLogger(h.c.GetLogLevel())
 	router := chi.NewRouter()
 
 	router.Route("/", func(router chi.Router) {
 		router.Post("/", h.postURL)
 		router.Get("/{id}", h.getShortURLByID)
 	})
-	//zlog.Printf("Listening on %v\nURL Template: %v", h.c.GetLocalServerAddr(), h.c.GetShortURLTemplate())
-	zlog.Info().Msgf("Listening on %v\nURL Template: %v\nLog Level: %v", h.c.GetLocalServerAddr(), h.c.GetShortURLTemplate(), h.c.GetLogLevel())
+	h.zlog.Info().Msgf("Listening on %v\nURL Template: %v\nLog Level: %v", h.c.GetLocalServerAddr(), h.c.GetShortURLTemplate(), h.c.GetLogLevel())
 
 	if err := http.ListenAndServe(h.c.GetLocalServerAddr(), h.requestLogger(router)); err != nil {
 		return err
@@ -56,7 +54,6 @@ func (h Handler) ListenAndServe() error {
 
 // postURL handles POST requests from clients and receives URL from body to store it in the Repository via Service
 func (h Handler) postURL(w http.ResponseWriter, r *http.Request) {
-	zlog := logger.NewLogger(h.c.GetLogLevel())
 	body, err := io.ReadAll(r.Body)
 	if err != nil || len(body) == 0 {
 		w.WriteHeader(http.StatusBadRequest)
@@ -71,14 +68,14 @@ func (h Handler) postURL(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.WriteHeader(http.StatusInternalServerError)
-		zlog.Error().Msgf("Failed to generate short url: %v", err)
+		h.zlog.Error().Msgf("Failed to generate short url: %v", err)
 		return
 	}
 
 	host := h.c.GetShortURLTemplate() + "/" + id
 	w.WriteHeader(http.StatusCreated)
 	if _, err = w.Write([]byte(host)); err != nil {
-		zlog.Error().Msgf("Failed to write response: %v", err)
+		h.zlog.Error().Msgf("Failed to write response: %v", err)
 	}
 }
 
@@ -113,8 +110,6 @@ type (
 func (h Handler) requestLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		zlog := logger.NewLogger(h.c.GetLogLevel())
-
 		start := time.Now()
 
 		responseData := &responseData{
@@ -128,7 +123,7 @@ func (h Handler) requestLogger(next http.Handler) http.Handler {
 
 		next.ServeHTTP(&lw, r)
 
-		zlog.
+		h.zlog.
 			Info().
 			Str("method", r.Method).
 			Str("url", r.RequestURI).
@@ -140,15 +135,15 @@ func (h Handler) requestLogger(next http.Handler) http.Handler {
 	})
 }
 
+// Write is redeclared method for embedding size into response logging
 func (r *loggingResponseWriter) Write(b []byte) (int, error) {
-	// записываем ответ, используя оригинальный http.ResponseWriter
 	size, err := r.ResponseWriter.Write(b)
-	r.responseData.size += size // захватываем размер
+	r.responseData.size += size
 	return size, err
 }
 
+// WriteHeader is redeclared method for embedding status code into response logging
 func (r *loggingResponseWriter) WriteHeader(statusCode int) {
-	// записываем код статуса, используя оригинальный http.ResponseWriter
 	r.ResponseWriter.WriteHeader(statusCode)
-	r.responseData.status = statusCode // захватываем код статуса
+	r.responseData.status = statusCode
 }
