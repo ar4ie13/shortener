@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"strconv"
+	"strings"
 )
 
 var (
@@ -77,13 +79,19 @@ func (c *Config) InitConfig() {
 	flag.Parse()
 
 	if serverAddr := os.Getenv("SERVER_ADDRESS"); serverAddr != "" {
+		if _, err := strconv.Unquote("\"" + serverAddr + "\""); err != nil {
+			parts := strings.SplitN(serverAddr, ":", 2)
+			if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+				log.Fatalf("Invalid SERVER_ADDRESS format: %s (expected host:port)\n", serverAddr)
+			}
+		}
 		c.LocalServerAddr = serverAddr
 	}
 
 	if baseURL := os.Getenv("BASE_URL"); baseURL != "" {
 		err := c.ShortURLTemplate.Set(baseURL)
 		if err != nil {
-			log.Fatalf("Failed to set short URL template: %v\n", err)
+			log.Fatalf("Failed to set short URL template from BASE_URL env: %v\n", err)
 		}
 	}
 }
