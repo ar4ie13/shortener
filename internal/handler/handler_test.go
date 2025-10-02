@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"github.com/go-chi/chi/v5"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
@@ -18,6 +19,7 @@ import (
 type MockConfig struct {
 	LocalServerAddr  string
 	ShortURLTemplate string
+	LogLevel         zerolog.Level
 }
 
 func (c *MockConfig) GetLocalServerAddr() string {
@@ -28,6 +30,11 @@ func (c *MockConfig) GetLocalServerAddr() string {
 func (c *MockConfig) GetShortURLTemplate() string {
 	c.ShortURLTemplate = "http://localhost:8080"
 	return c.ShortURLTemplate
+}
+
+func (c *MockConfig) GetLogLevel() zerolog.Level {
+	c.LogLevel = zerolog.InfoLevel
+	return c.LogLevel
 }
 
 type MockService struct {
