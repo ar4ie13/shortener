@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"github.com/ar4ie13/shortener/internal/model"
 	"github.com/ar4ie13/shortener/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
@@ -98,7 +97,7 @@ func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.zlog.Debug().Msg("decoding request")
-	var req model.LongURL
+	var req LongURL
 	dec := json.NewDecoder(buf)
 	if err = dec.Decode(&req); err != nil {
 		h.zlog.Debug().Msgf("cannot decode request JSON body: %v", h.zlog.Err(err))
@@ -118,7 +117,7 @@ func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := model.ShortURL{
+	resp := ShortURL{
 		ShortURL: h.c.GetShortURLTemplate() + "/" + id,
 	}
 

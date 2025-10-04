@@ -1,4 +1,4 @@
-package model
+package handler
 
 type LongURL struct {
 	LongURL string `json:"url"`
