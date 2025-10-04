@@ -100,7 +100,7 @@ func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
 	h.zlog.Debug().Msg("decoding request")
 	var req model.LongURL
 	dec := json.NewDecoder(buf)
-	if err := dec.Decode(&req); err != nil {
+	if err = dec.Decode(&req); err != nil {
 		h.zlog.Debug().Msgf("cannot decode request JSON body: %v", h.zlog.Err(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -123,11 +123,14 @@ func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 	enc := json.NewEncoder(w)
 	if err = enc.Encode(resp); err != nil {
 		h.zlog.Debug().Msgf("error encoding response: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
 	h.zlog.Debug().Msg("sending HTTP 200 response")
 }
 
