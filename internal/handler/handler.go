@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
+	"github.com/ar4ie13/shortener/internal/model"
 	"github.com/ar4ie13/shortener/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
@@ -42,6 +45,9 @@ func (h Handler) ListenAndServe() error {
 	router.Route("/", func(router chi.Router) {
 		router.Post("/", h.postURL)
 		router.Get("/{id}", h.getShortURLByID)
+		router.Route("/api", func(router chi.Router) {
+			router.Post("/shorten", h.postURLJSON)
+		})
 	})
 	h.zlog.Info().Msgf("Listening on %v\nURL Template: %v\nLog Level: %v", h.c.GetLocalServerAddr(), h.c.GetShortURLTemplate(), h.c.GetLogLevel())
 
@@ -77,6 +83,52 @@ func (h Handler) postURL(w http.ResponseWriter, r *http.Request) {
 	if _, err = w.Write([]byte(host)); err != nil {
 		h.zlog.Error().Msgf("Failed to write response: %v", err)
 	}
+}
+
+func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Content-Type") != "application/json" {
+		w.WriteHeader(http.StatusBadRequest)
+	}
+
+	buf := new(bytes.Buffer)
+	n, err := buf.ReadFrom(r.Body)
+	if err != nil || n == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	h.zlog.Debug().Msg("decoding request")
+	var req model.LongURL
+	dec := json.NewDecoder(buf)
+	if err := dec.Decode(&req); err != nil {
+		h.zlog.Debug().Msgf("cannot decode request JSON body: %v", h.zlog.Err(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	id, err := h.s.GenerateShortURL(req.LongURL)
+	if err != nil {
+		if errors.Is(err, service.ErrEmptyURL) || errors.Is(err, service.ErrInvalidURLFormat) ||
+			errors.Is(err, service.ErrWrongHTTPScheme) || errors.Is(err, service.ErrMustIncludeHost) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		h.zlog.Error().Msgf("Failed to generate short url: %v", err)
+		return
+	}
+
+	resp := model.ShortURL{
+		ShortURL: h.c.GetShortURLTemplate() + "/" + id,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	enc := json.NewEncoder(w)
+	if err = enc.Encode(resp); err != nil {
+		h.zlog.Debug().Msgf("error encoding response: %v", err)
+		return
+	}
+	h.zlog.Debug().Msg("sending HTTP 200 response")
 }
 
 // getShortURLByID handles get requests and redirects to the URL by provided shortURL if it is found in Repository
