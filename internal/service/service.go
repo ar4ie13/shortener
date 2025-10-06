@@ -6,6 +6,7 @@ import (
 	"github.com/ar4ie13/shortener/internal/repository"
 	"math/rand"
 	"net/url"
+	"strings"
 )
 
 var (
@@ -57,6 +58,9 @@ func (s Service) GetURL(id string) (string, error) {
 
 // GenerateShortURL generates shortURL for non-existent URL and stores it in the Repository
 func (s Service) GenerateShortURL(urlLink string) (slug string, err error) {
+
+	urlLink = strings.TrimRight(urlLink, "/")
+
 	if urlLink == "" {
 		return "", ErrEmptyURL
 	}

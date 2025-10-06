@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"fmt"
 )
 
 var (
@@ -60,6 +61,8 @@ func (repo *Repository) Save(id string, url string) error {
 	}
 
 	repo.urlLib[id] = url
+
+	fmt.Println(repo.urlLib)
 
 	return nil
 }

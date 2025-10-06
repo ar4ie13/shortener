@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -41,6 +42,10 @@ func NewHandler(s Service, c Config, zlog zerolog.Logger) *Handler {
 func (h Handler) ListenAndServe() error {
 	router := chi.NewRouter()
 
+	// middleware for router
+	router.Use(h.requestLogger)
+	router.Use(gzipMiddleware)
+
 	router.Route("/", func(router chi.Router) {
 		router.Post("/", h.postURL)
 		router.Get("/{id}", h.getShortURLByID)
@@ -50,7 +55,7 @@ func (h Handler) ListenAndServe() error {
 	})
 	h.zlog.Info().Msgf("Listening on %v\nURL Template: %v\nLog Level: %v", h.c.GetLocalServerAddr(), h.c.GetShortURLTemplate(), h.c.GetLogLevel())
 
-	if err := http.ListenAndServe(h.c.GetLocalServerAddr(), h.requestLogger(router)); err != nil {
+	if err := http.ListenAndServe(h.c.GetLocalServerAddr(), router); err != nil {
 		return err
 	}
 
@@ -147,20 +152,7 @@ func (h Handler) getShortURLByID(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-// loggingResponseWriter structure for logging size and status code of responses
-type (
-	responseData struct {
-		status int
-		size   int
-	}
-
-	loggingResponseWriter struct {
-		http.ResponseWriter
-		responseData *responseData
-	}
-)
-
-// middleware logger using zerolog
+// requestLogger is middleware logger using zerolog
 func (h Handler) requestLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -189,15 +181,33 @@ func (h Handler) requestLogger(next http.Handler) http.Handler {
 	})
 }
 
-// Write is redeclared method for embedding size into response logging
-func (r *loggingResponseWriter) Write(b []byte) (int, error) {
-	size, err := r.ResponseWriter.Write(b)
-	r.responseData.size += size
-	return size, err
-}
+// gzipMiddleware is a middleware used for decompress requests and compress responses when required
+func gzipMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-// WriteHeader is redeclared method for embedding status code into response logging
-func (r *loggingResponseWriter) WriteHeader(statusCode int) {
-	r.ResponseWriter.WriteHeader(statusCode)
-	r.responseData.status = statusCode
+		ow := w
+
+		acceptEncoding := r.Header.Get("Accept-Encoding")
+		supportsGzip := strings.Contains(acceptEncoding, "gzip")
+		if supportsGzip {
+			cw := newCompressWriter(w)
+			ow = cw
+			defer cw.Close()
+		}
+
+		contentEncoding := r.Header.Get("Content-Encoding")
+		sendsGzip := strings.Contains(contentEncoding, "gzip")
+		if sendsGzip {
+			cr, err := newCompressReader(r.Body)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			r.Body = cr
+			defer cr.Close()
+		}
+
+		// передаём управление хендлеру
+		next.ServeHTTP(ow, r)
+	})
 }
