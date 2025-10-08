@@ -1,6 +1,5 @@
 package repository
 
-/*
 import (
 	"errors"
 	"fmt"
@@ -9,25 +8,28 @@ import (
 
 func TestNewRepository(t *testing.T) {
 	tests := []struct {
-		name          string
-		wantMapLength int
+		name            string
+		wantSliceLength int
+		filepath        string
 	}{
 		{
-			name:          "NewRepository",
-			wantMapLength: 0,
+			name:            "NewRepository",
+			wantSliceLength: 0,
+			filepath:        "",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewRepository(); len(got.urlLib) != tt.wantMapLength {
-				t.Errorf("NewRepository() urlLib map lenth = %v, want %v", got, tt.wantMapLength)
+			if got, _ := NewRepository(tt.filepath); len(got.urlLib) != tt.wantSliceLength {
+				t.Errorf("NewRepository() urlLib lenth = %v, want %v", got, tt.wantSliceLength)
 			}
-			if got := NewRepository(); got.urlLib == nil {
-				t.Errorf("NewRepository() urlLib map is nil")
+			if got, _ := NewRepository(tt.filepath); got.urlLib == nil {
+				t.Errorf("NewRepository() urlLib is nil")
 			}
-			if got := NewRepository(); got == nil {
+			if got, _ := NewRepository(tt.filepath); got == nil {
 				t.Errorf("NewRepository() struct is nil")
 			}
+
 		})
 	}
 }
@@ -50,8 +52,12 @@ func TestRepository_Get(t *testing.T) {
 		{
 			name: "Valid ID",
 			fields: fields{
-				urlLib: map[string]string{
-					"abc123": "https://example.com",
+				urlLib: []store{
+					{
+						1,
+						"abc123",
+						"https://example.com",
+					},
 				},
 			},
 			args: args{
@@ -64,8 +70,12 @@ func TestRepository_Get(t *testing.T) {
 		{
 			name: "Non-existent ID",
 			fields: fields{
-				urlLib: map[string]string{
-					"abc12": "https://example.com",
+				urlLib: []store{
+					{
+						UUID:     1,
+						ShortURL: "abc12",
+						URL:      "https://example.com",
+					},
 				},
 			},
 			args: args{
@@ -78,8 +88,12 @@ func TestRepository_Get(t *testing.T) {
 		{
 			name: "Empty input parameter",
 			fields: fields{
-				urlLib: map[string]string{
-					"abc12": "https://example.com",
+				urlLib: []store{
+					{
+						UUID:     1,
+						ShortURL: "abc12",
+						URL:      "https://example.com",
+					},
 				},
 			},
 			args: args{
@@ -125,24 +139,32 @@ func TestRepository_Save(t *testing.T) {
 		wantErrName error
 	}{
 		{
-			name: "Valid ID and URL",
+			name: "Valid ID and URL without storage file",
 			fields: fields{
-				urlLib: map[string]string{
-					"abc123": "https://example.com",
+				urlLib: []store{
+					{
+						UUID:     1,
+						ShortURL: "abc123",
+						URL:      "https://example.com",
+					},
 				},
 			},
 			args: args{
 				id:  "abc12",
 				url: "https://examplenew.com",
 			},
-			wantErr:     false,
-			wantErrName: nil,
+			wantErr:     true,
+			wantErrName: ErrFileStorage,
 		},
 		{
 			name: "Valid ID and existent URL",
 			fields: fields{
-				urlLib: map[string]string{
-					"abc123": "https://example.com",
+				urlLib: []store{
+					{
+						UUID:     1,
+						ShortURL: "abc123",
+						URL:      "https://example.com",
+					},
 				},
 			},
 			args: args{
@@ -155,8 +177,12 @@ func TestRepository_Save(t *testing.T) {
 		{
 			name: "Empty ID and existent URL",
 			fields: fields{
-				urlLib: map[string]string{
-					"abc123": "https://example.com",
+				urlLib: []store{
+					{
+						UUID:     1,
+						ShortURL: "abc123",
+						URL:      "https://example.com",
+					},
 				},
 			},
 			args: args{
@@ -169,8 +195,12 @@ func TestRepository_Save(t *testing.T) {
 		{
 			name: "Valid ID and empty URL",
 			fields: fields{
-				urlLib: map[string]string{
-					"abc123": "https://example.com",
+				urlLib: []store{
+					{
+						UUID:     1,
+						ShortURL: "abc123",
+						URL:      "https://example.com",
+					},
 				},
 			},
 			args: args{
@@ -211,8 +241,12 @@ func TestRepository_exists(t *testing.T) {
 		{
 			name: "Exists URL",
 			fields: fields{
-				urlLib: map[string]string{
-					"abc123": "https://example.com",
+				urlLib: []store{
+					{
+						UUID:     1,
+						ShortURL: "abc123",
+						URL:      "https://example.com",
+					},
 				},
 			},
 			args: args{
@@ -223,8 +257,12 @@ func TestRepository_exists(t *testing.T) {
 		{
 			name: "Not existsURL URL",
 			fields: fields{
-				urlLib: map[string]string{
-					"abc123": "https://example.com",
+				urlLib: []store{
+					{
+						UUID:     1,
+						ShortURL: "abc123",
+						URL:      "https://example.com",
+					},
 				},
 			},
 			args: args{
@@ -244,5 +282,3 @@ func TestRepository_exists(t *testing.T) {
 		})
 	}
 }
-
-*/

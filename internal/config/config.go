@@ -156,6 +156,7 @@ func (c *Config) GetLogLevel() zerolog.Level {
 	return c.LogLevel.Level
 }
 
+// GetFileStorage return filepath for json storage of repos urlLib
 func (c *Config) GetFileStorage() string {
 	return c.FileStorage
 }

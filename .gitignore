@@ -27,3 +27,6 @@ vendor/
 
 # Makefile
 Makefile
+
+# storage.json
+storage.json
