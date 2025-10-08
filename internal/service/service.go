@@ -26,8 +26,8 @@ const (
 
 // Repository interface used to interact with repository package to store or retrieve values
 type Repository interface {
-	Get(id string) (string, error)
-	Save(id string, url string) error
+	Get(shortURL string) (string, error)
+	Save(shortURL string, url string) error
 }
 
 // Service is a main object of the package that implements Repository interface
@@ -41,12 +41,12 @@ func NewService(r Repository) *Service {
 }
 
 // GetURL method gets URL by provided id
-func (s Service) GetURL(id string) (string, error) {
-	if id == "" {
+func (s Service) GetURL(shortURL string) (string, error) {
+	if shortURL == "" {
 		return "", errEmptyID
 	}
 
-	idURL, err := s.r.Get(id)
+	idURL, err := s.r.Get(shortURL)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) || errors.Is(err, repository.ErrEmptyIDorURL) {
 			return "", fmt.Errorf("failed to get URL: %w", err)
@@ -102,7 +102,7 @@ func (s Service) GenerateShortURL(urlLink string) (slug string, err error) {
 		}
 
 		if attempt == 3 {
-			if errors.Is(err, repository.ErrIDExist) {
+			if errors.Is(err, repository.ErrShortURLExist) {
 				return "", fmt.Errorf("failed to save URL to repository: %w", err)
 			}
 		}

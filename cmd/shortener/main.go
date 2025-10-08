@@ -18,12 +18,15 @@ func main() {
 
 func run() error {
 	cfg := config.NewConfig()
-	repo := repository.NewRepository()
+	repo, err := repository.NewRepository(cfg.GetFileStorage())
+	if err != nil {
+		return err
+	}
 	srv := service.NewService(repo)
 	zlog := logger.NewLogger(cfg.GetLogLevel())
 	hdlr := handler.NewHandler(srv, cfg, zlog.Logger)
 
-	if err := hdlr.ListenAndServe(); err != nil {
+	if err = hdlr.ListenAndServe(); err != nil {
 		return fmt.Errorf("shortener service error: %w", err)
 	}
 

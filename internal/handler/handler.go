@@ -9,8 +9,6 @@ import (
 	"github.com/rs/zerolog"
 	"io"
 	"net/http"
-	"strings"
-	"time"
 )
 
 // Service interface interacts with service package
@@ -150,64 +148,4 @@ func (h Handler) getShortURLByID(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Location", url)
 	w.WriteHeader(http.StatusTemporaryRedirect)
-}
-
-// requestLogger is middleware logger using zerolog
-func (h Handler) requestLogger(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		start := time.Now()
-
-		responseData := &responseData{
-			status: 0,
-			size:   0,
-		}
-		lw := loggingResponseWriter{
-			ResponseWriter: w, // встраиваем оригинальный http.ResponseWriter
-			responseData:   responseData,
-		}
-
-		next.ServeHTTP(&lw, r)
-
-		h.zlog.
-			Info().
-			Str("method", r.Method).
-			Str("url", r.RequestURI).
-			Str("user_agent", r.UserAgent()).
-			Int("size", responseData.size).
-			Dur("elapsed_ms", time.Since(start)).
-			Int("status", responseData.status).
-			Msg("incoming request")
-	})
-}
-
-// gzipMiddleware is a middleware used for decompress requests and compress responses when required
-func gzipMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		ow := w
-
-		acceptEncoding := r.Header.Get("Accept-Encoding")
-		supportsGzip := strings.Contains(acceptEncoding, "gzip")
-		if supportsGzip {
-			cw := newCompressWriter(w)
-			ow = cw
-			defer cw.Close()
-		}
-
-		contentEncoding := r.Header.Get("Content-Encoding")
-		sendsGzip := strings.Contains(contentEncoding, "gzip")
-		if sendsGzip {
-			cr, err := newCompressReader(r.Body)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			r.Body = cr
-			defer cr.Close()
-		}
-
-		// передаём управление хендлеру
-		next.ServeHTTP(ow, r)
-	})
 }

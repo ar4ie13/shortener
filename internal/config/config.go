@@ -27,6 +27,7 @@ type Config struct {
 	LocalServerAddr  string
 	ShortURLTemplate ShortURLTemplate
 	LogLevel         LogLevel
+	FileStorage      string
 }
 
 // NewConfig constructor for Config
@@ -94,10 +95,12 @@ func (c *Config) InitConfig() {
 	defaultServerAddr := "localhost:8080"
 	defaultURL := "http://localhost:8080"
 	defaultLogLevel := LogLevel{Level: zerolog.InfoLevel}
+	defaultFileStorage := "./storage.json"
 
 	flag.StringVar(&c.LocalServerAddr, "a", defaultServerAddr, "local server address")
 	flag.Var(&c.ShortURLTemplate, "b", "short url template")
 	flag.Var(&c.LogLevel, "l", "log level (debug, info, warn, error, fatal, panic)")
+	flag.StringVar(&c.FileStorage, "f", defaultFileStorage, "file storage path")
 
 	if err := c.ShortURLTemplate.Set(defaultURL); err != nil {
 		log.Fatal().Err(err).Msg("Failed to set default URL")
@@ -113,7 +116,7 @@ func (c *Config) InitConfig() {
 		if _, err := strconv.Unquote("\"" + serverAddr + "\""); err != nil {
 			parts := strings.SplitN(serverAddr, ":", 2)
 			if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-				log.Fatal().Err(err).Msg("Failed to set short URL template from BASE_URL")
+				log.Fatal().Err(err).Msg("Failed to set server address from SERVER_ADDRESS")
 			}
 		}
 		c.LocalServerAddr = serverAddr
@@ -122,7 +125,7 @@ func (c *Config) InitConfig() {
 	if baseURL := os.Getenv("BASE_URL"); baseURL != "" {
 		err := c.ShortURLTemplate.Set(baseURL)
 		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to set log level from LOG_LEVEL")
+			log.Fatal().Err(err).Msg("Failed to set URL template from BASE_URL")
 		}
 	}
 
@@ -131,6 +134,10 @@ func (c *Config) InitConfig() {
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to set log level from LOG_LEVEL")
 		}
+	}
+
+	if fileStorage := os.Getenv("FILE_STORAGE_PATH"); fileStorage != "" {
+		c.FileStorage = fileStorage
 	}
 }
 
@@ -147,4 +154,8 @@ func (c *Config) GetShortURLTemplate() string {
 // GetLogLevel returns logging level. Used in logger.NewLogger constructor.
 func (c *Config) GetLogLevel() zerolog.Level {
 	return c.LogLevel.Level
+}
+
+func (c *Config) GetFileStorage() string {
+	return c.FileStorage
 }

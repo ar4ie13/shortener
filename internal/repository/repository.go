@@ -1,45 +1,94 @@
 package repository
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"sync"
 )
 
 var (
-	ErrNotFound     = errors.New("not found")
-	ErrURLExist     = errors.New("URL already exist")
-	ErrEmptyIDorURL = errors.New("ID or URL cannot be empty")
-	ErrIDExist      = errors.New("ID already exist")
+	ErrNotFound      = errors.New("not found")
+	ErrURLExist      = errors.New("URL already exist")
+	ErrEmptyIDorURL  = errors.New("ID or URL cannot be empty")
+	ErrShortURLExist = errors.New("ID already exist")
 )
 
-// urlLib is used for storing the map id(shortURL):URL
-type urlLib map[string]string
+// store used to serialize and deserialize json file storage
+type store struct {
+	UUID     int    `json:"uuid"`
+	ShortURL string `json:"short_url"`
+	URL      string `json:"original_url"`
+}
+
+// urlLib is used for storing the map uuid:store{UUID, ShortURL, URL}
+type urlLib []store
+
+type fileStoreJSON struct {
+	filename string
+}
+
+type lastUUID struct {
+	UUID int
+}
 
 // Repository is the main object for the package repository
 type Repository struct {
+	mu sync.Mutex
 	urlLib
+	fileStoreJSON
+	lastUUID
 }
 
 // NewRepository is a constructor for Repository object
-func NewRepository() *Repository {
-	return &Repository{
-		urlLib: make(map[string]string),
+func NewRepository(filename string) (*Repository, error) {
+
+	repo := &Repository{
+		mu:            sync.Mutex{},
+		urlLib:        make(urlLib, 0),
+		fileStoreJSON: fileStoreJSON{filename: filename},
 	}
+	if err := repo.load(); err != nil {
+		return nil, err
+	}
+	return repo, nil
+}
+
+// getLastID method is used to get last UUID stored in repo
+func (repo *Repository) getLastID() int {
+	if len(repo.urlLib) == 0 {
+		return 1
+	}
+	return repo.lastUUID.UUID
 }
 
 // Get method is used to get URL (link) from the repository map
-func (repo *Repository) Get(id string) (string, error) {
-	if link, ok := repo.urlLib[id]; ok {
-		return link, nil
+func (repo *Repository) Get(shortURL string) (string, error) {
+	for _, v := range repo.urlLib {
+		if v.ShortURL == shortURL {
+			return v.URL, nil
+		}
 	}
 
 	return "", ErrNotFound
 }
 
-// exists check if URL exist in the map
-func (repo *Repository) exists(url string) bool {
+// existsURL check if URL exist in the map
+func (repo *Repository) existsURL(url string) bool {
 	for _, v := range repo.urlLib {
-		if v == url {
+		if v.URL == url {
+			return true
+		}
+	}
+
+	return false
+}
+
+// existsShortURL check if URL exist in the map
+func (repo *Repository) existsShortURL(shortURL string) bool {
+	for _, v := range repo.urlLib {
+		if v.ShortURL == shortURL {
 			return true
 		}
 	}
@@ -48,21 +97,57 @@ func (repo *Repository) exists(url string) bool {
 }
 
 // Save saves the id(shortURL):URL pair in the map
-func (repo *Repository) Save(id string, url string) error {
-	if id == "" || url == "" {
+func (repo *Repository) Save(shortURL string, url string) error {
+
+	if shortURL == "" || url == "" {
 		return ErrEmptyIDorURL
 	}
-	if repo.exists(url) {
+
+	if repo.existsURL(url) {
 		return ErrURLExist
 	}
 
-	if _, ok := repo.urlLib[id]; ok {
-		return ErrIDExist
+	if repo.existsShortURL(shortURL) {
+		return ErrShortURLExist
 	}
 
-	repo.urlLib[id] = url
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	lUUID := repo.lastUUID.UUID + 1
+	repo.urlLib = append(repo.urlLib, store{lUUID, shortURL, url})
 
-	fmt.Println(repo.urlLib)
+	file, err := json.MarshalIndent(repo.urlLib, "", "  ")
+	if err != nil {
+		return err
+	}
+	repo.lastUUID.UUID = lUUID
+	return os.WriteFile(repo.fileStoreJSON.filename, file, 0644)
+}
+
+// Load reads data from JSON file
+func (repo *Repository) load() error {
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+
+	file, err := os.ReadFile(repo.fileStoreJSON.filename)
+
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	if len(file) == 0 {
+		return nil
+	}
+
+	err = json.Unmarshal(file, &repo.urlLib)
+	if err != nil {
+		return fmt.Errorf("json unmarshal error of file:%s : %w", repo.fileStoreJSON.filename, err)
+	}
+
+	repo.lastUUID.UUID = len(repo.urlLib)
 
 	return nil
 }
