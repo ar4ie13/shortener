@@ -18,12 +18,12 @@ func main() {
 
 func run() error {
 	cfg := config.NewConfig()
-	repo, err := repository.NewRepository(cfg.GetFileStorage())
+	zlog := logger.NewLogger(cfg.GetLogLevel())
+	repo, err := repository.NewRepository(cfg.GetFileStorage(), zlog.Logger)
 	if err != nil {
 		return err
 	}
 	srv := service.NewService(repo)
-	zlog := logger.NewLogger(cfg.GetLogLevel())
 	hdlr := handler.NewHandler(srv, cfg, zlog.Logger)
 
 	if err = hdlr.ListenAndServe(); err != nil {

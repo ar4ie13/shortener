@@ -3,8 +3,7 @@ package filestorage
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"log"
+	"github.com/rs/zerolog"
 	"os"
 	"sync"
 )
@@ -19,6 +18,7 @@ type FileStorage struct {
 	urlMapping
 	lastUUID
 	filePath string
+	zlog     zerolog.Logger
 	mu       sync.Mutex
 }
 
@@ -30,11 +30,12 @@ type urlMapping struct {
 }
 
 // NewFileStorage constructor receives filepath to store data in file and initializes main file storage object
-func NewFileStorage(filepath string) *FileStorage {
+func NewFileStorage(filepath string, zlog zerolog.Logger) *FileStorage {
 	return &FileStorage{
 		urlMapping: urlMapping{},
 		lastUUID:   lastUUID{},
 		filePath:   filepath,
+		zlog:       zlog,
 		mu:         sync.Mutex{},
 	}
 }
@@ -102,16 +103,16 @@ func (fs *FileStorage) LoadFile() (shortURLMap map[string]string, err error) {
 			if err.Error() == "EOF" {
 				break
 			}
-			log.Printf("Error decoding JSON: %v\n", err)
+			fs.zlog.Debug().Msgf("error decoding JSON: %v\n", err)
 			continue
 		}
 
 		shortURLMap[fs.urlMapping.ShortURL] = fs.urlMapping.URL
-		log.Printf("Read: UUID=%d, ShortURL=%s\n, URL=%s\n", fs.urlMapping.UUID, fs.urlMapping.ShortURL, fs.urlMapping.URL)
+		fs.zlog.Debug().Msgf("read: UUID=%d, ShortURL=%s, URL=%s", fs.urlMapping.UUID, fs.urlMapping.ShortURL, fs.urlMapping.URL)
+
 	}
 
-	log.Printf("\nMap contains %d items:\n", len(shortURLMap))
-	fmt.Println("shurl: ", shortURLMap)
+	fs.zlog.Debug().Msgf("map contains %d items", len(shortURLMap))
 
 	fs.lastUUID.UUID = len(shortURLMap)
 

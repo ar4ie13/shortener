@@ -1,47 +1,44 @@
 package memory
 
-/*
 import (
 	"errors"
 	"fmt"
-	"github.com/ar4ie13/shortener/internal/repository/filestorage"
+	"github.com/ar4ie13/shortener/internal/service"
 	"testing"
 )
 
-func TestNewRepository(t *testing.T) {
+func TestNewMemStorage(t *testing.T) {
 	tests := []struct {
-		name            string
-		wantSliceLength int
-		filepath        string
+		name              string
+		expectedMapLength int
 	}{
 		{
-			name:            "NewMemStorage",
-			wantSliceLength: 0,
-			filepath:        "",
+			name:              "NewMemStorage",
+			expectedMapLength: 0,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got, _ := NewMemStorage(tt.filepath); len(got.urlLib) != tt.wantSliceLength {
-				t.Errorf("NewMemStorage() urlLib lenth = %v, want %v", got, tt.wantSliceLength)
+			if got := NewMemStorage(); len(got.urlMemStore) != tt.expectedMapLength || len(got.slugMemStore) != tt.expectedMapLength {
+				t.Errorf("NewMemStorage() urlLib lenth = %v, want %v", got, tt.expectedMapLength)
 			}
-			if got, _ := NewMemStorage(tt.filepath); got.urlLib == nil {
-				t.Errorf("NewMemStorage() urlLib is nil")
+			if got := NewMemStorage(); got.slugMemStore == nil || got.urlMemStore == nil {
+				t.Errorf("NewMemStorage() slugMemStore or urlMemStore is nil")
 			}
-			if got, _ := NewMemStorage(tt.filepath); got == nil {
+			if got := NewMemStorage(); got == nil {
 				t.Errorf("NewMemStorage() struct is nil")
 			}
-
 		})
 	}
 }
 
-func TestRepository_Get(t *testing.T) {
+func TestMemory_Get(t *testing.T) {
 	type fields struct {
-		urlLib urlLib
+		slugMemStore map[string]string
+		urlMemStore  map[string]string
 	}
 	type args struct {
-		id string
+		slug string
 	}
 	tests := []struct {
 		name      string
@@ -52,66 +49,64 @@ func TestRepository_Get(t *testing.T) {
 		wantError error
 	}{
 		{
-			name: "Valid ID",
+			name: "Valid slug",
 			fields: fields{
-				urlLib: []filestorage.urlMapping{
-					{
-						1,
-						"abc123",
-						"https://example.com",
-					},
+				slugMemStore: slugMemStore{
+					"abc123": "https://example.com",
+				},
+				urlMemStore: urlMemStore{
+					"https://example.com": "abc123",
 				},
 			},
 			args: args{
-				id: "abc123",
+				slug: "abc123",
 			},
 			want:      "https://example.com",
 			wantErr:   false,
 			wantError: nil,
 		},
 		{
-			name: "Non-existent ID",
+			name: "Non-existent slug",
 			fields: fields{
-				urlLib: []filestorage.urlMapping{
-					{
-						UUID:     1,
-						ShortURL: "abc12",
-						URL:      "https://example.com",
-					},
+				slugMemStore: slugMemStore{
+					"abc12": "https://example.com",
+				},
+				urlMemStore: urlMemStore{
+					"https://example.com": "abc12",
 				},
 			},
 			args: args{
-				id: "abc123",
+				slug: "abc123",
 			},
 			want:      "",
 			wantErr:   true,
-			wantError: ErrNotFound,
+			wantError: service.ErrNotFound,
 		},
 		{
 			name: "Empty input parameter",
 			fields: fields{
-				urlLib: []filestorage.urlMapping{
-					{
-						UUID:     1,
-						ShortURL: "abc12",
-						URL:      "https://example.com",
-					},
+				slugMemStore: slugMemStore{
+					"abc12": "https://example.com",
+				},
+				urlMemStore: urlMemStore{
+					"https://example.com": "abc12",
 				},
 			},
 			args: args{
-				id: "",
+				slug: "",
 			},
 			want:      "",
 			wantErr:   true,
-			wantError: ErrNotFound,
+			wantError: service.ErrNotFound,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &MemStorage{
-				urlLib: tt.fields.urlLib,
+				slugMemStore: tt.fields.slugMemStore,
+				urlMemStore:  tt.fields.urlMemStore,
 			}
-			got, err := repo.Get(tt.args.id)
+			got, err := repo.Get(tt.args.slug)
 			if got != tt.want {
 				t.Errorf("Get() got = %v, want %v", got, tt.want)
 			}
@@ -124,14 +119,15 @@ func TestRepository_Get(t *testing.T) {
 	}
 }
 
-func TestRepository_Save(t *testing.T) {
+func TestMemory_Save(t *testing.T) {
 
 	type fields struct {
-		urlLib urlLib
+		slugMemStore map[string]string
+		urlMemStore  map[string]string
 	}
 	type args struct {
-		id  string
-		url string
+		slug string
+		url  string
 	}
 	tests := []struct {
 		name        string
@@ -141,85 +137,82 @@ func TestRepository_Save(t *testing.T) {
 		wantErrName error
 	}{
 		{
-			name: "Valid ID and URL without storage file",
+			name: "Valid slug and URL",
 			fields: fields{
-				urlLib: []filestorage.urlMapping{
-					{
-						UUID:     1,
-						ShortURL: "abc123",
-						URL:      "https://example.com",
-					},
+				slugMemStore: slugMemStore{
+					"abc123": "https://example.com",
+				},
+				urlMemStore: urlMemStore{
+					"https://example.com": "abc123",
 				},
 			},
 			args: args{
-				id:  "abc12",
-				url: "https://examplenew.com",
+				slug: "abc12",
+				url:  "https://examplenew.com",
 			},
-			wantErr:     true,
-			wantErrName: ErrFileStorage,
+			wantErr:     false,
+			wantErrName: nil,
 		},
 		{
-			name: "Valid ID and existent URL",
+			name: "Valid slug and existent URL",
 			fields: fields{
-				urlLib: []filestorage.urlMapping{
-					{
-						UUID:     1,
-						ShortURL: "abc123",
-						URL:      "https://example.com",
-					},
+				slugMemStore: slugMemStore{
+					"abc123": "https://example.com",
+				},
+				urlMemStore: urlMemStore{
+					"https://example.com": "abc123",
 				},
 			},
 			args: args{
-				id:  "abc12",
-				url: "https://example.com",
+				slug: "abc12",
+				url:  "https://example.com",
 			},
 			wantErr:     true,
-			wantErrName: ErrURLExist,
+			wantErrName: service.ErrURLExist,
 		},
 		{
-			name: "Empty ID and existent URL",
+			name: "Empty slug and existent URL",
 			fields: fields{
-				urlLib: []filestorage.urlMapping{
-					{
-						UUID:     1,
-						ShortURL: "abc123",
-						URL:      "https://example.com",
-					},
+				slugMemStore: slugMemStore{
+					"abc123": "https://example.com",
+				},
+				urlMemStore: urlMemStore{
+					"https://example.com": "abc123",
 				},
 			},
 			args: args{
-				id:  "",
-				url: "https://example.com",
+				slug: "",
+				url:  "https://example.com",
 			},
 			wantErr:     true,
-			wantErrName: ErrEmptyIDorURL,
+			wantErrName: service.ErrEmptyIDorURL,
 		},
 		{
-			name: "Valid ID and empty URL",
+			name: "Valid slug and empty URL",
 			fields: fields{
-				urlLib: []filestorage.urlMapping{
-					{
-						UUID:     1,
-						ShortURL: "abc123",
-						URL:      "https://example.com",
-					},
+				slugMemStore: slugMemStore{
+					"abc123": "https://example.com",
+				},
+				urlMemStore: urlMemStore{
+					"https://example.com": "abc123",
 				},
 			},
 			args: args{
-				id:  "abc",
-				url: "",
+				slug: "abc",
+				url:  "",
 			},
 			wantErr:     true,
-			wantErrName: ErrEmptyIDorURL,
+			wantErrName: service.ErrEmptyIDorURL,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &MemStorage{
-				urlLib: tt.fields.urlLib,
+				slugMemStore: tt.fields.slugMemStore,
+				urlMemStore:  tt.fields.urlMemStore,
 			}
 
-			if err := repo.Save(tt.args.id, tt.args.url); (err != nil) != tt.wantErr || !errors.Is(err, tt.wantErrName) {
+			if err := repo.Save(tt.args.slug, tt.args.url); (err != nil) != tt.wantErr || !errors.Is(err, tt.wantErrName) {
 				fmt.Println(err, tt.wantErrName)
 				t.Errorf("Save() error = %s, wantErr %s", err, tt.wantErrName)
 			}
@@ -227,9 +220,10 @@ func TestRepository_Save(t *testing.T) {
 	}
 }
 
-func TestRepository_exists(t *testing.T) {
+func TestMemory_existsURL(t *testing.T) {
 	type fields struct {
-		urlLib urlLib
+		slugMemStore map[string]string
+		urlMemStore  map[string]string
 	}
 	type args struct {
 		url string
@@ -243,12 +237,11 @@ func TestRepository_exists(t *testing.T) {
 		{
 			name: "Exists URL",
 			fields: fields{
-				urlLib: []filestorage.urlMapping{
-					{
-						UUID:     1,
-						ShortURL: "abc123",
-						URL:      "https://example.com",
-					},
+				slugMemStore: slugMemStore{
+					"abc123": "https://example.com",
+				},
+				urlMemStore: urlMemStore{
+					"https://example.com": "abc123",
 				},
 			},
 			args: args{
@@ -259,12 +252,11 @@ func TestRepository_exists(t *testing.T) {
 		{
 			name: "Not existsURL URL",
 			fields: fields{
-				urlLib: []filestorage.urlMapping{
-					{
-						UUID:     1,
-						ShortURL: "abc123",
-						URL:      "https://example.com",
-					},
+				slugMemStore: slugMemStore{
+					"abc123": "https://example.com",
+				},
+				urlMemStore: urlMemStore{
+					"https://example.com": "abc123",
 				},
 			},
 			args: args{
@@ -276,7 +268,8 @@ func TestRepository_exists(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &MemStorage{
-				urlLib: tt.fields.urlLib,
+				slugMemStore: tt.fields.slugMemStore,
+				urlMemStore:  tt.fields.urlMemStore,
 			}
 			if got := repo.existsURL(tt.args.url); got != tt.want {
 				t.Errorf("existsURL() = %v, want %v", got, tt.want)
@@ -285,4 +278,60 @@ func TestRepository_exists(t *testing.T) {
 	}
 }
 
-*/
+func TestMemory_existsShortURL(t *testing.T) {
+	type fields struct {
+		slugMemStore map[string]string
+		urlMemStore  map[string]string
+	}
+	type args struct {
+		slug string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   bool
+	}{
+		{
+			name: "Exists URL",
+			fields: fields{
+				slugMemStore: slugMemStore{
+					"abc123": "https://example.com",
+				},
+				urlMemStore: urlMemStore{
+					"https://example.com": "abc123",
+				},
+			},
+			args: args{
+				slug: "abc123",
+			},
+			want: true,
+		},
+		{
+			name: "Not existsURL URL",
+			fields: fields{
+				slugMemStore: slugMemStore{
+					"abc123": "https://example.com",
+				},
+				urlMemStore: urlMemStore{
+					"https://example.com": "abc123",
+				},
+			},
+			args: args{
+				slug: "abc",
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &MemStorage{
+				slugMemStore: tt.fields.slugMemStore,
+				urlMemStore:  tt.fields.urlMemStore,
+			}
+			if got := repo.existsShortURL(tt.args.slug); got != tt.want {
+				t.Errorf("existsShortURL() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

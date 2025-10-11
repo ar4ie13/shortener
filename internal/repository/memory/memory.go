@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"fmt"
 	"github.com/ar4ie13/shortener/internal/service"
 )
 
@@ -52,7 +51,7 @@ func (repo *MemStorage) existsShortURL(shortURL string) bool {
 	return false
 }
 
-// Save saves the id(shortURL):URL pair in the map
+// Save saves the slug(shortURL):URL pair in the map
 func (repo *MemStorage) Save(shortURL string, url string) error {
 
 	if shortURL == "" || url == "" {
@@ -79,8 +78,6 @@ func (repo *MemStorage) Load(shortURLMap map[string]string) error {
 		repo.slugMemStore[k] = shortURLMap[k]
 		repo.urlMemStore[v] = k
 	}
-
-	fmt.Println("memory maps: ", repo.slugMemStore, repo.urlMemStore)
 
 	return nil
 }

@@ -9,14 +9,11 @@ import (
 )
 
 var (
-	// Repository errors
 	ErrNotFound      = errors.New("not found")
 	ErrURLExist      = errors.New("URL already exist")
 	ErrEmptyIDorURL  = errors.New("ID or URL cannot be empty")
 	ErrShortURLExist = errors.New("ID already exist")
-	ErrFileStorage   = errors.New("file storage error")
 
-	// Service errors
 	ErrEmptyURL         = errors.New("URL template cannot be empty")
 	ErrWrongHTTPScheme  = errors.New("URL template must use http or https scheme")
 	ErrMustIncludeHost  = errors.New("URL template must include a host")

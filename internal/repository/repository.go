@@ -3,6 +3,7 @@ package repository
 import (
 	"github.com/ar4ie13/shortener/internal/repository/filestorage"
 	"github.com/ar4ie13/shortener/internal/repository/memory"
+	"github.com/rs/zerolog"
 )
 
 // Repository is a main repository object contains both memory and file storage
@@ -12,10 +13,10 @@ type Repository struct {
 }
 
 // NewRepository constructs repository object
-func NewRepository(filepath string) (*Repository, error) {
+func NewRepository(filepath string, zlog zerolog.Logger) (*Repository, error) {
 	repo := &Repository{
 		m: memory.NewMemStorage(),
-		f: filestorage.NewFileStorage(filepath),
+		f: filestorage.NewFileStorage(filepath, zlog),
 	}
 	err := repo.Load()
 	if err != nil {
