@@ -28,5 +28,5 @@ vendor/
 # Makefile
 Makefile
 
-# storage.json
-storage.json
+# storage.jsonl
+storage.jsonl
