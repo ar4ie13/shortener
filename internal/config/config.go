@@ -4,8 +4,13 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
 	"net/url"
+	"os"
+	"strconv"
+	"strings"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -21,6 +26,8 @@ type ShortURLTemplate string
 type Config struct {
 	LocalServerAddr  string
 	ShortURLTemplate ShortURLTemplate
+	LogLevel         LogLevel
+	FileStorage      string
 }
 
 // NewConfig constructor for Config
@@ -62,27 +69,94 @@ func (u *ShortURLTemplate) Set(value string) error {
 	return nil
 }
 
+// LogLevel type for custom log level flag
+type LogLevel struct {
+	Level zerolog.Level
+}
+
+// String returns log level as string
+func (l *LogLevel) String() string {
+	return l.Level.String()
+}
+
+// Set validates and sets the log level from string
+func (l *LogLevel) Set(value string) error {
+	level, err := zerolog.ParseLevel(strings.ToLower(value))
+	if err != nil {
+		return fmt.Errorf("invalid log level: %v", err)
+	}
+	l.Level = level
+	return nil
+}
+
 // InitConfig initialize configuration
 func (c *Config) InitConfig() {
-	flag.StringVar(&c.LocalServerAddr, "a", "localhost:8080", "local server address")
 
+	defaultServerAddr := "localhost:8080"
 	defaultURL := "http://localhost:8080"
+	defaultLogLevel := LogLevel{Level: zerolog.InfoLevel}
+	defaultFileStorage := "./storage.jsonl"
+
+	flag.StringVar(&c.LocalServerAddr, "a", defaultServerAddr, "local server address")
+	flag.Var(&c.ShortURLTemplate, "b", "short url template")
+	flag.Var(&c.LogLevel, "l", "log level (debug, info, warn, error, fatal, panic)")
+	flag.StringVar(&c.FileStorage, "f", defaultFileStorage, "file storage path")
+
 	if err := c.ShortURLTemplate.Set(defaultURL); err != nil {
-		log.Fatalf("Failed to set default URL: %v\n", err)
+		log.Fatal().Err(err).Msg("Failed to set default URL")
 	}
 
-	flag.Var(&c.ShortURLTemplate, "b", "short url template")
+	if err := c.LogLevel.Set(defaultLogLevel.String()); err != nil {
+		log.Fatal().Err(err).Msg("Failed to set default log level")
+	}
 
 	flag.Parse()
+
+	if serverAddr := os.Getenv("SERVER_ADDRESS"); serverAddr != "" {
+		if _, err := strconv.Unquote("\"" + serverAddr + "\""); err != nil {
+			parts := strings.SplitN(serverAddr, ":", 2)
+			if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+				log.Fatal().Err(err).Msg("Failed to set server address from SERVER_ADDRESS")
+			}
+		}
+		c.LocalServerAddr = serverAddr
+	}
+
+	if baseURL := os.Getenv("BASE_URL"); baseURL != "" {
+		err := c.ShortURLTemplate.Set(baseURL)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to set URL template from BASE_URL")
+		}
+	}
+
+	if logLevelStr := os.Getenv("LOG_LEVEL"); logLevelStr != "" {
+		err := c.LogLevel.Set(logLevelStr)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to set log level from LOG_LEVEL")
+		}
+	}
+
+	if fileStorage := os.Getenv("FILE_STORAGE_PATH"); fileStorage != "" {
+		c.FileStorage = fileStorage
+	}
 }
 
 // GetLocalServerAddr returns localserver address string
 func (c *Config) GetLocalServerAddr() string {
-
 	return c.LocalServerAddr
 }
 
 // GetShortURLTemplate returns Short URL template string
 func (c *Config) GetShortURLTemplate() string {
 	return string(c.ShortURLTemplate)
+}
+
+// GetLogLevel returns logging level. Used in logger.NewLogger constructor.
+func (c *Config) GetLogLevel() zerolog.Level {
+	return c.LogLevel.Level
+}
+
+// GetFileStorage return filepath for json storage of repos urlLib
+func (c *Config) GetFileStorage() string {
+	return c.FileStorage
 }

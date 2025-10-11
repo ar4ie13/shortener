@@ -3,13 +3,16 @@ package handler
 import (
 	"errors"
 	"github.com/go-chi/chi/v5"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 // This part will test two main handlers for POST and GET methods
@@ -18,6 +21,7 @@ import (
 type MockConfig struct {
 	LocalServerAddr  string
 	ShortURLTemplate string
+	LogLevel         zerolog.Level
 }
 
 func (c *MockConfig) GetLocalServerAddr() string {
@@ -30,9 +34,27 @@ func (c *MockConfig) GetShortURLTemplate() string {
 	return c.ShortURLTemplate
 }
 
+func (c *MockConfig) GetLogLevel() zerolog.Level {
+	c.LogLevel = zerolog.InfoLevel
+	return c.LogLevel
+}
+
 type MockService struct {
 	urlLib map[string]string
 	err    error
+}
+
+type MockLogger struct {
+	logger zerolog.Logger
+}
+
+func NewLogger(level zerolog.Level) *MockLogger {
+	return &MockLogger{
+		logger: zerolog.New(zerolog.ConsoleWriter{
+			Out:        os.Stdout,
+			TimeFormat: time.RFC3339,
+		}).With().Timestamp().Logger().Level(level),
+	}
 }
 
 // GetURL mocks the Service GetURL method
@@ -135,8 +157,11 @@ func TestGetShortURLByID(t *testing.T) {
 			}
 			mockConfig := &MockConfig{
 				LocalServerAddr: "localhost:8080",
+				LogLevel:        zerolog.InfoLevel,
 			}
-			h := NewHandler(mockService, mockConfig)
+
+			mockLogger := NewLogger(mockConfig.LogLevel)
+			h := NewHandler(mockService, mockConfig, mockLogger.logger)
 
 			router := chi.NewRouter()
 			router.Route("/", func(router chi.Router) {
@@ -202,7 +227,9 @@ func TestPostURL(t *testing.T) {
 				err:    tt.storageErr,
 			}
 			mockConfig := &MockConfig{}
-			handler := NewHandler(mockService, mockConfig)
+
+			mockLogger := NewLogger(mockConfig.LogLevel)
+			handler := NewHandler(mockService, mockConfig, mockLogger.logger)
 
 			// Create HTTP request
 			req, err := http.NewRequest(http.MethodPost, tt.path, strings.NewReader(tt.body))

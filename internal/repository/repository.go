@@ -1,65 +1,64 @@
 package repository
 
 import (
-	"errors"
+	"github.com/ar4ie13/shortener/internal/repository/filestorage"
+	"github.com/ar4ie13/shortener/internal/repository/memory"
+	"github.com/rs/zerolog"
 )
 
-var (
-	ErrNotFound     = errors.New("not found")
-	ErrURLExist     = errors.New("URL already exist")
-	ErrEmptyIDorURL = errors.New("ID or URL cannot be empty")
-	ErrIDExist      = errors.New("ID already exist")
-)
-
-// urlLib is used for storing the map id(shortURL):URL
-type urlLib map[string]string
-
-// Repository is the main object for the package repository
+// Repository is a main repository object contains both memory and file storage
 type Repository struct {
-	urlLib
+	m *memory.MemStorage
+	f *filestorage.FileStorage
 }
 
-// NewRepository is a constructor for Repository object
-func NewRepository() *Repository {
-	return &Repository{
-		urlLib: make(map[string]string),
+// NewRepository constructs repository object
+func NewRepository(filepath string, zlog zerolog.Logger) (*Repository, error) {
+	repo := &Repository{
+		m: memory.NewMemStorage(),
+		f: filestorage.NewFileStorage(filepath, zlog),
 	}
+	err := repo.Load()
+	if err != nil {
+		return nil, err
+	}
+	return repo, nil
 }
 
-// Get method is used to get URL (link) from the repository map
-func (repo *Repository) Get(id string) (string, error) {
-	if link, ok := repo.urlLib[id]; ok {
-		return link, nil
+// Save is a method used to save short url and original url
+func (repo *Repository) Save(shortURL string, url string) error {
+	if err := repo.m.Save(shortURL, url); err != nil {
+		return err
 	}
 
-	return "", ErrNotFound
+	if err := repo.f.Store(shortURL, url); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-// exists check if URL exist in the map
-func (repo *Repository) exists(url string) bool {
-	for _, v := range repo.urlLib {
-		if v == url {
-			return true
-		}
+// Get method is used to get URL (link) from the map
+func (repo *Repository) Get(shortURL string) (string, error) {
+	slug, err := repo.m.Get(shortURL)
+	if err != nil {
+		return "", err
 	}
 
-	return false
+	return slug, nil
 }
 
-// Save saves the id(shortURL):URL pair in the map
-func (repo *Repository) Save(id string, url string) error {
-	if id == "" || url == "" {
-		return ErrEmptyIDorURL
-	}
-	if repo.exists(url) {
-		return ErrURLExist
+// Load reads data from JSON file into maps
+func (repo *Repository) Load() error {
+	shortURLMap, err := repo.f.LoadFile()
+	if err != nil {
+		return err
 	}
 
-	if _, ok := repo.urlLib[id]; ok {
-		return ErrIDExist
+	err = repo.m.Load(shortURLMap)
+	if err != nil {
+		return err
 	}
-
-	repo.urlLib[id] = url
 
 	return nil
 }
