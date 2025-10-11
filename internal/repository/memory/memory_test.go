@@ -54,7 +54,7 @@ func TestRepository_Get(t *testing.T) {
 		{
 			name: "Valid ID",
 			fields: fields{
-				urlLib: []filestorage.URLMapping{
+				urlLib: []filestorage.urlMapping{
 					{
 						1,
 						"abc123",
@@ -72,7 +72,7 @@ func TestRepository_Get(t *testing.T) {
 		{
 			name: "Non-existent ID",
 			fields: fields{
-				urlLib: []filestorage.URLMapping{
+				urlLib: []filestorage.urlMapping{
 					{
 						UUID:     1,
 						ShortURL: "abc12",
@@ -90,7 +90,7 @@ func TestRepository_Get(t *testing.T) {
 		{
 			name: "Empty input parameter",
 			fields: fields{
-				urlLib: []filestorage.URLMapping{
+				urlLib: []filestorage.urlMapping{
 					{
 						UUID:     1,
 						ShortURL: "abc12",
@@ -143,7 +143,7 @@ func TestRepository_Save(t *testing.T) {
 		{
 			name: "Valid ID and URL without storage file",
 			fields: fields{
-				urlLib: []filestorage.URLMapping{
+				urlLib: []filestorage.urlMapping{
 					{
 						UUID:     1,
 						ShortURL: "abc123",
@@ -161,7 +161,7 @@ func TestRepository_Save(t *testing.T) {
 		{
 			name: "Valid ID and existent URL",
 			fields: fields{
-				urlLib: []filestorage.URLMapping{
+				urlLib: []filestorage.urlMapping{
 					{
 						UUID:     1,
 						ShortURL: "abc123",
@@ -179,7 +179,7 @@ func TestRepository_Save(t *testing.T) {
 		{
 			name: "Empty ID and existent URL",
 			fields: fields{
-				urlLib: []filestorage.URLMapping{
+				urlLib: []filestorage.urlMapping{
 					{
 						UUID:     1,
 						ShortURL: "abc123",
@@ -197,7 +197,7 @@ func TestRepository_Save(t *testing.T) {
 		{
 			name: "Valid ID and empty URL",
 			fields: fields{
-				urlLib: []filestorage.URLMapping{
+				urlLib: []filestorage.urlMapping{
 					{
 						UUID:     1,
 						ShortURL: "abc123",
@@ -243,7 +243,7 @@ func TestRepository_exists(t *testing.T) {
 		{
 			name: "Exists URL",
 			fields: fields{
-				urlLib: []filestorage.URLMapping{
+				urlLib: []filestorage.urlMapping{
 					{
 						UUID:     1,
 						ShortURL: "abc123",
@@ -259,7 +259,7 @@ func TestRepository_exists(t *testing.T) {
 		{
 			name: "Not existsURL URL",
 			fields: fields{
-				urlLib: []filestorage.URLMapping{
+				urlLib: []filestorage.urlMapping{
 					{
 						UUID:     1,
 						ShortURL: "abc123",

@@ -11,16 +11,10 @@ type slugMemStore map[string]string
 // urlMemStore stores URL:slug
 type urlMemStore map[string]string
 
-// fileStorage interface to interact with file storage
-type fileStorage interface {
-	Store(shortUrl string, url string) error
-}
-
 // MemStorage is the main object for the package repository
 type MemStorage struct {
 	slugMemStore
 	urlMemStore
-	fileStorage
 }
 
 // NewMemStorage is a constructor for MemStorage object

@@ -37,7 +37,7 @@ func (repo *Repository) Save(shortURL string, url string) error {
 	return nil
 }
 
-// Get method is used to get URL (link) from the map in memory
+// Get method is used to get URL (link) from the map
 func (repo *Repository) Get(shortURL string) (string, error) {
 	slug, err := repo.m.Get(shortURL)
 	if err != nil {

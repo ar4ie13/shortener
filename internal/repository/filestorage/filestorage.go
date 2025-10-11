@@ -14,16 +14,16 @@ type lastUUID struct {
 	UUID int
 }
 
-// FileStorage is a main file storage object contains FilePath, store struct and last used UUID
+// FileStorage is a main file storage object contains filePath, store struct and last used UUID
 type FileStorage struct {
-	URLMapping
-	LastUUID lastUUID
-	FilePath string
-	Mu       sync.Mutex
+	urlMapping
+	lastUUID
+	filePath string
+	mu       sync.Mutex
 }
 
-// URLMapping used to serialize and deserialize json file storage
-type URLMapping struct {
+// urlMapping used to serialize and deserialize json file storage
+type urlMapping struct {
 	UUID     int    `json:"uuid"`
 	ShortURL string `json:"short_url"`
 	URL      string `json:"original_url"`
@@ -32,29 +32,29 @@ type URLMapping struct {
 // NewFileStorage constructor receives filepath to store data in file and initializes main file storage object
 func NewFileStorage(filepath string) *FileStorage {
 	return &FileStorage{
-		URLMapping: URLMapping{},
-		LastUUID:   lastUUID{},
-		FilePath:   filepath,
-		Mu:         sync.Mutex{},
+		urlMapping: urlMapping{},
+		lastUUID:   lastUUID{},
+		filePath:   filepath,
+		mu:         sync.Mutex{},
 	}
 }
 
 // Store is method to store UUID, short_url and original_url in jsonl format
-func (fs *FileStorage) Store(shortUrl string, url string) error {
-	fs.Mu.Lock()
-	defer fs.Mu.Unlock()
+func (fs *FileStorage) Store(shortURL string, url string) error {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
 
-	fs.URLMapping.UUID = fs.LastUUID.UUID + 1
-	fs.URLMapping.ShortURL = shortUrl
-	fs.URLMapping.URL = url
+	fs.urlMapping.UUID = fs.lastUUID.UUID + 1
+	fs.urlMapping.ShortURL = shortURL
+	fs.urlMapping.URL = url
 
-	file, err := os.OpenFile(fs.FilePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	file, err := os.OpenFile(fs.filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		panic(err)
 	}
 	defer file.Close()
 
-	jsonLine, err := json.Marshal(fs.URLMapping)
+	jsonLine, err := json.Marshal(fs.urlMapping)
 	if err != nil {
 		panic(err)
 	}
@@ -67,7 +67,7 @@ func (fs *FileStorage) Store(shortUrl string, url string) error {
 		panic(err)
 	}
 
-	fs.LastUUID.UUID++
+	fs.lastUUID.UUID++
 
 	return nil
 
@@ -76,7 +76,7 @@ func (fs *FileStorage) Store(shortUrl string, url string) error {
 // LoadFile loads json file storage and returns maps for memory storage
 func (fs *FileStorage) LoadFile() (shortURLMap map[string]string, err error) {
 	shortURLMap = make(map[string]string)
-	file, err := os.ReadFile(fs.FilePath)
+	file, err := os.ReadFile(fs.filePath)
 
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -95,7 +95,7 @@ func (fs *FileStorage) LoadFile() (shortURLMap map[string]string, err error) {
 
 	for {
 
-		err = decoder.Decode(&fs.URLMapping)
+		err = decoder.Decode(&fs.urlMapping)
 
 		if err != nil {
 			// Check for EOF
@@ -106,14 +106,14 @@ func (fs *FileStorage) LoadFile() (shortURLMap map[string]string, err error) {
 			continue
 		}
 
-		shortURLMap[fs.URLMapping.ShortURL] = fs.URLMapping.URL
-		log.Printf("Read: UUID=%d, ShortURL=%s\n, URL=%s\n", fs.URLMapping.UUID, fs.URLMapping.ShortURL, fs.URLMapping.URL)
+		shortURLMap[fs.urlMapping.ShortURL] = fs.urlMapping.URL
+		log.Printf("Read: UUID=%d, ShortURL=%s\n, URL=%s\n", fs.urlMapping.UUID, fs.urlMapping.ShortURL, fs.urlMapping.URL)
 	}
 
 	log.Printf("\nMap contains %d items:\n", len(shortURLMap))
 	fmt.Println("shurl: ", shortURLMap)
 
-	fs.LastUUID.UUID = len(shortURLMap)
+	fs.lastUUID.UUID = len(shortURLMap)
 
 	return shortURLMap, nil
 }
