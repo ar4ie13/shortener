@@ -2,7 +2,6 @@ package service
 
 import (
 	"errors"
-	"github.com/ar4ie13/shortener/internal/repository"
 	"reflect"
 	"testing"
 )
@@ -16,21 +15,21 @@ type MockRepository struct {
 func (m *MockRepository) Get(id string) (string, error) {
 	url, exists := m.urls[id]
 	if !exists {
-		return "", repository.ErrNotFound
+		return "", ErrNotFound
 	}
 	return url, nil
 }
 
 func (m *MockRepository) Save(id string, url string) error {
 	if id == "" || url == "" {
-		return repository.ErrEmptyIDorURL
+		return ErrEmptyIDorURL
 	}
 	if m.err != nil {
 		return m.err
 	}
 	for _, v := range m.urls {
 		if v == url {
-			return repository.ErrURLExist
+			return ErrURLExist
 		}
 	}
 	m.urls[id] = url
@@ -102,7 +101,7 @@ func TestService_GenerateShortURL(t *testing.T) {
 			},
 
 			wantErr:    true,
-			wantErrMsg: repository.ErrURLExist,
+			wantErrMsg: ErrURLExist,
 		},
 		{
 			name: "Empty test",
@@ -184,7 +183,7 @@ func TestService_GetURL(t *testing.T) {
 			},
 			want:       "",
 			wantErr:    true,
-			wantErrMsg: repository.ErrNotFound,
+			wantErrMsg: ErrNotFound,
 		}, {
 			name: "Empty id",
 			fields: MockRepository{
