@@ -1,4 +1,4 @@
-package handler
+package handlers
 
 import (
 	"bytes"
@@ -24,7 +24,7 @@ type Config interface {
 	GetLogLevel() zerolog.Level
 }
 
-// Handler is a main object for package handler
+// Handler is a main object for package handlers
 type Handler struct {
 	s    Service
 	c    Config

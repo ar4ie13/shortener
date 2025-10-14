@@ -1,4 +1,4 @@
-package handler
+package handlers
 
 import (
 	"errors"
@@ -240,7 +240,7 @@ func TestPostURL(t *testing.T) {
 			// Create response recorder
 			rr := httptest.NewRecorder()
 
-			// Call handler
+			// Call handlers
 			handler.postURL(rr, req)
 
 			// Check status code
