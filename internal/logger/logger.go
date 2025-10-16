@@ -1,9 +1,10 @@
 package logger
 
 import (
-	"github.com/rs/zerolog"
 	"os"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 // Logger wraps a zerolog.Logger for type safety and extensibility

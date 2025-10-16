@@ -1,11 +1,7 @@
-package handler
+package handlers
 
 import (
 	"errors"
-	"github.com/go-chi/chi/v5"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +9,11 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // This part will test two main handlers for POST and GET methods
@@ -22,6 +23,10 @@ type MockConfig struct {
 	LocalServerAddr  string
 	ShortURLTemplate string
 	LogLevel         zerolog.Level
+}
+
+func (c *MockConfig) CheckPostgresConnection() error {
+	return nil
 }
 
 func (c *MockConfig) GetLocalServerAddr() string {
@@ -240,7 +245,7 @@ func TestPostURL(t *testing.T) {
 			// Create response recorder
 			rr := httptest.NewRecorder()
 
-			// Call handler
+			// Call handlers
 			handler.postURL(rr, req)
 
 			// Check status code

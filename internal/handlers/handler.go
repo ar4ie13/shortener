@@ -1,14 +1,15 @@
-package handler
+package handlers
 
 import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
+
 	"github.com/ar4ie13/shortener/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
-	"io"
-	"net/http"
 )
 
 // Service interface interacts with service package
@@ -22,9 +23,10 @@ type Config interface {
 	GetLocalServerAddr() string
 	GetShortURLTemplate() string
 	GetLogLevel() zerolog.Level
+	CheckPostgresConnection() error
 }
 
-// Handler is a main object for package handler
+// Handler is a main object for package handlers
 type Handler struct {
 	s    Service
 	c    Config
@@ -47,6 +49,7 @@ func (h Handler) ListenAndServe() error {
 	router.Route("/", func(router chi.Router) {
 		router.Post("/", h.postURL)
 		router.Get("/{id}", h.getShortURLByID)
+		router.Get("/ping", h.checkPostgresConnection)
 		router.Route("/api", func(router chi.Router) {
 			router.Post("/shorten", h.postURLJSON)
 		})
@@ -148,4 +151,13 @@ func (h Handler) getShortURLByID(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Location", url)
 	w.WriteHeader(http.StatusTemporaryRedirect)
+}
+
+func (h Handler) checkPostgresConnection(w http.ResponseWriter, r *http.Request) {
+	err := h.c.CheckPostgresConnection()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }

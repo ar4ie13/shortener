@@ -127,5 +127,3 @@ func generateShortURL(length int) (string, error) {
 
 	return string(shortURL), nil
 }
-
-var ()

@@ -1,6 +1,8 @@
 package config
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"flag"
 	"fmt"
@@ -8,9 +10,13 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
+	postgresqlConfig "github.com/ar4ie13/shortener/internal/repository/db/postgresql/config"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 var (
@@ -28,12 +34,20 @@ type Config struct {
 	ShortURLTemplate ShortURLTemplate
 	LogLevel         LogLevel
 	FileStorage      string
+	PostgresDSN      postgresqlConfig.Config
 }
 
 // NewConfig constructor for Config
 func NewConfig() *Config {
 	c := &Config{}
 	c.InitConfig()
+	// TODO: Add this when required to check connection when service starts
+	/*
+		if err := c.CheckPostgresConnection(); err != nil {
+			log.Fatal().Err(err).Msg("failed to connect to postgresql")
+		}
+
+	*/
 	return c
 }
 
@@ -96,11 +110,13 @@ func (c *Config) InitConfig() {
 	defaultURL := "http://localhost:8080"
 	defaultLogLevel := LogLevel{Level: zerolog.InfoLevel}
 	defaultFileStorage := "./storage.jsonl"
+	defaultDatabaseDSN := "host=localhost port=5432 user=videos password=userpassword dbname=videos sslmode=disable"
 
 	flag.StringVar(&c.LocalServerAddr, "a", defaultServerAddr, "local server address")
 	flag.Var(&c.ShortURLTemplate, "b", "short url template")
 	flag.Var(&c.LogLevel, "l", "log level (debug, info, warn, error, fatal, panic)")
 	flag.StringVar(&c.FileStorage, "f", defaultFileStorage, "file storage path")
+	flag.StringVar(&c.PostgresDSN.DatabaseDSN, "d", defaultDatabaseDSN, "database DSN")
 
 	if err := c.ShortURLTemplate.Set(defaultURL); err != nil {
 		log.Fatal().Err(err).Msg("Failed to set default URL")
@@ -139,6 +155,25 @@ func (c *Config) InitConfig() {
 	if fileStorage := os.Getenv("FILE_STORAGE_PATH"); fileStorage != "" {
 		c.FileStorage = fileStorage
 	}
+
+	if databaseDSN := os.Getenv("DATABASE_DSN"); databaseDSN != "" {
+		c.PostgresDSN.DatabaseDSN = databaseDSN
+	}
+}
+
+// TODO: Add this when required to check when service starts: CheckPostgresConnection validates the connection to PostgreSQL database
+func (c *Config) CheckPostgresConnection() error {
+	db, err := sql.Open("pgx", c.PostgresDSN.DatabaseDSN)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err = db.PingContext(ctx); err != nil {
+		return err
+	}
+	return nil
 }
 
 // GetLocalServerAddr returns localserver address string
