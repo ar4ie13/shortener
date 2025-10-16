@@ -1,14 +1,10 @@
 package postgresql
 
 import (
-	"context"
-	"database/sql"
-	"fmt"
-	"time"
-
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
+/*
 func CheckConn() error {
 	ps := fmt.Sprint("host=localhost port=5432 user=videos password=userpassword dbname=videos sslmode=disable")
 
@@ -26,3 +22,5 @@ func CheckConn() error {
 	}
 	return nil
 }
+
+*/
