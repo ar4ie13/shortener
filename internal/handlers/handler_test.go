@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -63,7 +64,7 @@ func NewLogger(level zerolog.Level) *MockLogger {
 }
 
 // GetURL mocks the Service GetURL method
-func (m *MockService) GetURL(id string) (string, error) {
+func (m *MockService) GetURL(_ context.Context, id string) (string, error) {
 	if m.err != nil {
 		return "", m.err
 	}
@@ -75,7 +76,7 @@ func (m *MockService) GetURL(id string) (string, error) {
 }
 
 // GenerateShortURL mocks the Service GenerateShortURL method
-func (m *MockService) GenerateShortURL(url string) (string, error) {
+func (m *MockService) GenerateShortURL(_ context.Context, url string) (string, error) {
 	if m.err != nil {
 		return "", m.err
 	}
@@ -220,7 +221,7 @@ func TestPostURL(t *testing.T) {
 			storageErr:     errors.New("id already exists"),
 			body:           "www.ya.ru",
 			expectedStatus: http.StatusInternalServerError,
-			expectedBody:   "",
+			expectedBody:   "id already exists\n",
 		},
 	}
 

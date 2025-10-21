@@ -1,13 +1,15 @@
 package service
 
 import (
+	"context"
 	"errors"
+	"reflect"
+	"testing"
+
 	"github.com/ar4ie13/shortener/internal/service/internal/mockery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"reflect"
-	"testing"
 )
 
 // HandyMockRepository implements Repository interface for testing
@@ -16,7 +18,7 @@ type HandyMockRepository struct {
 	err  error
 }
 
-func (m *HandyMockRepository) Get(id string) (string, error) {
+func (m *HandyMockRepository) Get(_ context.Context, id string) (string, error) {
 	url, exists := m.urls[id]
 	if !exists {
 		return "", ErrNotFound
@@ -24,7 +26,7 @@ func (m *HandyMockRepository) Get(id string) (string, error) {
 	return url, nil
 }
 
-func (m *HandyMockRepository) Save(id string, url string) error {
+func (m *HandyMockRepository) Save(_ context.Context, id string, url string) error {
 	if id == "" || url == "" {
 		return ErrEmptyIDorURL
 	}
@@ -134,7 +136,7 @@ func TestService_GenerateShortURL(t *testing.T) {
 			s := Service{
 				&r,
 			}
-			_, err := s.GenerateShortURL(tt.args.url)
+			_, err := s.GenerateShortURL(context.Background(), tt.args.url)
 			if ((err != nil) != tt.wantErr) || (tt.wantErr && !errors.Is(err, tt.wantErrMsg)) {
 				t.Errorf("%v", !errors.Is(err, tt.wantErrMsg))
 				t.Errorf("GenerateShortURL() error = %v, wantErr %v", err, tt.wantErrMsg)
@@ -144,90 +146,6 @@ func TestService_GenerateShortURL(t *testing.T) {
 		})
 	}
 }
-
-/*
-func TestService_GetURL(t *testing.T) {
-	type args struct {
-		id string
-	}
-	tests := []struct {
-		name       string
-		fields     HandyMockRepository
-		args       args
-		want       string
-		wantErr    bool
-		wantErrMsg error
-	}{
-		{
-			name: "Existent id",
-			fields: HandyMockRepository{
-				urls: map[string]string{
-					"abc": "https://google.com",
-					"xyz": "https://facebook.com",
-				},
-				err: nil,
-			},
-			args: args{
-				id: "abc",
-			},
-			want:       "https://google.com",
-			wantErr:    false,
-			wantErrMsg: nil,
-		},
-		{
-			name: "Non-existent id",
-			fields: HandyMockRepository{
-				urls: map[string]string{
-					"abc": "https://google.com",
-					"xyz": "https://facebook.com",
-				},
-				err: nil,
-			},
-			args: args{
-				id: "ab",
-			},
-			want:       "",
-			wantErr:    true,
-			wantErrMsg: ErrNotFound,
-		}, {
-			name: "Empty id",
-			fields: HandyMockRepository{
-				urls: map[string]string{
-					"abc": "https://google.com",
-					"xyz": "https://facebook.com",
-				},
-				err: nil,
-			},
-			args: args{
-				id: "",
-			},
-			want:       "",
-			wantErr:    true,
-			wantErrMsg: errEmptyID,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := HandyMockRepository{
-				tt.fields.urls,
-				tt.fields.err,
-			}
-			s := Service{
-				&r,
-			}
-
-			got, err := s.GetURL(tt.args.id)
-			if ((err != nil) != tt.wantErr) || (tt.wantErr && !errors.Is(err, tt.wantErrMsg)) {
-				t.Errorf("GetURL() error = %v, wantErr %v", err, tt.wantErrMsg)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("GetURL() got = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-*/
 
 func Test_generateShortURL(t *testing.T) {
 	type args struct {
@@ -323,10 +241,10 @@ func TestService_GetURL_Mockery(t *testing.T) {
 			service := Service{r: mockRepo}
 
 			if tt.shouldCallRepo {
-				mockRepo.On("Get", tt.shortURL).Return(tt.mockReturnURL, tt.mockReturnErr)
+				mockRepo.On("Get", context.Background(), tt.shortURL).Return(tt.mockReturnURL, tt.mockReturnErr)
 			}
 
-			result, err := service.GetURL(tt.shortURL)
+			result, err := service.GetURL(context.Background(), tt.shortURL)
 
 			assert.Equal(t, tt.expectedURL, result)
 			if tt.expectedErr != nil {
@@ -340,7 +258,7 @@ func TestService_GetURL_Mockery(t *testing.T) {
 			}
 
 			if tt.shouldCallRepo {
-				mockRepo.AssertCalled(t, "Get", tt.shortURL)
+				mockRepo.AssertCalled(t, "Get", context.Background(), tt.shortURL)
 			} else {
 				mockRepo.AssertNotCalled(t, "Get", mock.Anything)
 			}

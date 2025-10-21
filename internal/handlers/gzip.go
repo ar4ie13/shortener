@@ -8,7 +8,6 @@ import (
 )
 
 // compressWriter implements http.ResponseWriter
-// and allow to compress data and set correct HTTP headers transparently for server
 type compressWriter struct {
 	w  http.ResponseWriter
 	zw *gzip.Writer
@@ -30,18 +29,15 @@ func (c *compressWriter) Write(p []byte) (int, error) {
 }
 
 func (c *compressWriter) WriteHeader(statusCode int) {
-	if statusCode < 300 {
-		c.w.Header().Set("Content-Encoding", "gzip")
-	}
+	c.w.Header().Set("Content-Encoding", "gzip")
 	c.w.WriteHeader(statusCode)
 }
 
-// Close closes gzip.Writer and send all data from buffer.
 func (c *compressWriter) Close() error {
 	return c.zw.Close()
 }
 
-// compressReader implements io.ReadCloser and allow to decompress received from client data transparently for server
+// compressReader implements io.ReadCloser
 type compressReader struct {
 	r  io.ReadCloser
 	zr *gzip.Reader
@@ -52,14 +48,13 @@ func newCompressReader(r io.ReadCloser) (*compressReader, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return &compressReader{
 		r:  r,
 		zr: zr,
 	}, nil
 }
 
-func (c compressReader) Read(p []byte) (n int, err error) {
+func (c *compressReader) Read(p []byte) (n int, err error) {
 	return c.zr.Read(p)
 }
 
@@ -70,12 +65,12 @@ func (c *compressReader) Close() error {
 	return c.zr.Close()
 }
 
-// gzipMiddleware is a middleware used for decompress requests and compress responses when required
+// gzipMiddleware handles decompression of requests and compression of responses
 func gzipMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
 		ow := w
 
+		// Check if client supports gzip compression for response
 		acceptEncoding := r.Header.Get("Accept-Encoding")
 		supportsGzip := strings.Contains(acceptEncoding, "gzip")
 		if supportsGzip {
@@ -84,12 +79,15 @@ func gzipMiddleware(next http.Handler) http.Handler {
 			defer cw.Close()
 		}
 
+		// Check if request body is gzip-compressed
 		contentEncoding := r.Header.Get("Content-Encoding")
 		sendsGzip := strings.Contains(contentEncoding, "gzip")
 		if sendsGzip {
 			cr, err := newCompressReader(r.Body)
 			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
+				// Write error response without compression to avoid mismatch
+				w.Header().Del("Content-Encoding") // Ensure no gzip header
+				http.Error(w, "Failed to decompress request body", http.StatusInternalServerError)
 				return
 			}
 			r.Body = cr

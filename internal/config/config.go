@@ -12,7 +12,9 @@ import (
 	"strings"
 	"time"
 
-	postgresqlConfig "github.com/ar4ie13/shortener/internal/repository/db/postgresql/config"
+	pgconf "github.com/ar4ie13/shortener/internal/repository/db/postgresql/config"
+	fileconf "github.com/ar4ie13/shortener/internal/repository/filestorage/config"
+
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -33,8 +35,8 @@ type Config struct {
 	LocalServerAddr  string
 	ShortURLTemplate ShortURLTemplate
 	LogLevel         LogLevel
-	FileStorage      string
-	PostgresDSN      postgresqlConfig.Config
+	FilePath         fileconf.Config
+	PostgresDSN      pgconf.Config
 }
 
 // NewConfig constructor for Config
@@ -109,13 +111,13 @@ func (c *Config) InitConfig() {
 	defaultServerAddr := "localhost:8080"
 	defaultURL := "http://localhost:8080"
 	defaultLogLevel := LogLevel{Level: zerolog.InfoLevel}
-	defaultFileStorage := "./storage.jsonl"
-	defaultDatabaseDSN := "host=localhost port=5432 user=videos password=userpassword dbname=videos sslmode=disable"
+	defaultFileStorage := ""
+	defaultDatabaseDSN := ""
 
 	flag.StringVar(&c.LocalServerAddr, "a", defaultServerAddr, "local server address")
 	flag.Var(&c.ShortURLTemplate, "b", "short url template")
 	flag.Var(&c.LogLevel, "l", "log level (debug, info, warn, error, fatal, panic)")
-	flag.StringVar(&c.FileStorage, "f", defaultFileStorage, "file storage path")
+	flag.StringVar(&c.FilePath.FilePath, "f", defaultFileStorage, "file storage path")
 	flag.StringVar(&c.PostgresDSN.DatabaseDSN, "d", defaultDatabaseDSN, "database DSN")
 
 	if err := c.ShortURLTemplate.Set(defaultURL); err != nil {
@@ -153,7 +155,7 @@ func (c *Config) InitConfig() {
 	}
 
 	if fileStorage := os.Getenv("FILE_STORAGE_PATH"); fileStorage != "" {
-		c.FileStorage = fileStorage
+		c.FilePath.FilePath = fileStorage
 	}
 
 	if databaseDSN := os.Getenv("DATABASE_DSN"); databaseDSN != "" {
@@ -161,7 +163,8 @@ func (c *Config) InitConfig() {
 	}
 }
 
-// TODO: Add this when required to check when service starts: CheckPostgresConnection validates the connection to PostgreSQL database
+// CheckPostgresConnection TODO: Add this when required to check when service starts
+// CheckPostgresConnection validates the connection to PostgreSQL database
 func (c *Config) CheckPostgresConnection() error {
 	db, err := sql.Open("pgx", c.PostgresDSN.DatabaseDSN)
 	if err != nil {
@@ -189,9 +192,4 @@ func (c *Config) GetShortURLTemplate() string {
 // GetLogLevel returns logging level. Used in logger.NewLogger constructor.
 func (c *Config) GetLogLevel() zerolog.Level {
 	return c.LogLevel.Level
-}
-
-// GetFileStorage return filepath for json storage of repos urlLib
-func (c *Config) GetFileStorage() string {
-	return c.FileStorage
 }

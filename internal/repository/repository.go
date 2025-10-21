@@ -1,64 +1,50 @@
 package repository
 
 import (
+	"context"
+
+	"github.com/ar4ie13/shortener/internal/repository/db/postgresql"
+	pgconf "github.com/ar4ie13/shortener/internal/repository/db/postgresql/config"
 	"github.com/ar4ie13/shortener/internal/repository/filestorage"
+	fileconf "github.com/ar4ie13/shortener/internal/repository/filestorage/config"
 	"github.com/ar4ie13/shortener/internal/repository/memory"
+	"github.com/ar4ie13/shortener/internal/service"
 	"github.com/rs/zerolog"
 )
 
-// Repository is a main repository object contains both memory and file storage
+// Repository is a main repository object
 type Repository struct {
-	m *memory.MemStorage
-	f *filestorage.FileStorage
+	m  *memory.MemStorage
+	f  *filestorage.FileStorage
+	db *postgresql.DB
 }
 
-// NewRepository constructs repository object
-func NewRepository(filepath string, zlog zerolog.Logger) (*Repository, error) {
-	repo := &Repository{
-		m: memory.NewMemStorage(),
-		f: filestorage.NewFileStorage(filepath, zlog),
+// NewRepository return the correct interface for service depending on used store method
+func NewRepository(
+	ctx context.Context,
+	fileconf fileconf.Config,
+	pgcfg pgconf.Config,
+	zlog zerolog.Logger,
+) (service.Repository, error) {
+	switch {
+	case pgcfg.DatabaseDSN != "":
+		db, err := postgresql.NewDB(ctx, pgcfg, zlog)
+		if err != nil {
+			return nil, err
+		}
+		err = postgresql.ApplyMigrations(pgcfg, zlog)
+		if err != nil {
+			return nil, err
+		}
+		return db, nil
+	case fileconf.FilePath != "":
+		filestore := filestorage.NewFileStorage(fileconf, zlog)
+		err := filestore.Load()
+		if err != nil {
+			return nil, err
+		}
+		return filestore, nil
+	default:
+		return memory.NewMemStorage(), nil
 	}
-	err := repo.Load()
-	if err != nil {
-		return nil, err
-	}
-	return repo, nil
-}
-
-// Save is a method used to save short url and original url
-func (repo *Repository) Save(shortURL string, url string) error {
-	if err := repo.m.Save(shortURL, url); err != nil {
-		return err
-	}
-
-	if err := repo.f.Store(shortURL, url); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Get method is used to get URL (link) from the map
-func (repo *Repository) Get(shortURL string) (string, error) {
-	slug, err := repo.m.Get(shortURL)
-	if err != nil {
-		return "", err
-	}
-
-	return slug, nil
-}
-
-// Load reads data from JSON file into maps
-func (repo *Repository) Load() error {
-	shortURLMap, err := repo.f.LoadFile()
-	if err != nil {
-		return err
-	}
-
-	err = repo.m.Load(shortURLMap)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }

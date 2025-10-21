@@ -1,13 +1,15 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"log"
+
 	"github.com/ar4ie13/shortener/internal/config"
 	"github.com/ar4ie13/shortener/internal/handlers"
 	"github.com/ar4ie13/shortener/internal/logger"
 	"github.com/ar4ie13/shortener/internal/repository"
 	"github.com/ar4ie13/shortener/internal/service"
-	"log"
 )
 
 func main() {
@@ -19,9 +21,9 @@ func main() {
 func run() error {
 	cfg := config.NewConfig()
 	zlog := logger.NewLogger(cfg.GetLogLevel())
-	repo, err := repository.NewRepository(cfg.GetFileStorage(), zlog.Logger)
+	repo, err := repository.NewRepository(context.Background(), cfg.FilePath, cfg.PostgresDSN, zlog.Logger)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot initialize repository: %w", err)
 	}
 	srv := service.NewService(repo)
 	hdlr := handlers.NewHandler(srv, cfg, zlog.Logger)

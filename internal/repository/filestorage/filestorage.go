@@ -2,10 +2,15 @@ package filestorage
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
-	"github.com/rs/zerolog"
 	"os"
 	"sync"
+
+	"github.com/ar4ie13/shortener/internal/model"
+	fileconf "github.com/ar4ie13/shortener/internal/repository/filestorage/config"
+	"github.com/ar4ie13/shortener/internal/repository/memory"
+	"github.com/rs/zerolog"
 )
 
 // lastUUID is used for storing last used UUID in store
@@ -15,29 +20,62 @@ type lastUUID struct {
 
 // FileStorage is a main file storage object contains filePath, store struct and last used UUID
 type FileStorage struct {
-	urlMapping
+	m          *memory.MemStorage
+	urlMapping model.URL
 	lastUUID
-	filePath string
+	filePath fileconf.Config
 	zlog     zerolog.Logger
 	mu       sync.Mutex
 }
 
-// urlMapping used to serialize and deserialize json file storage
-type urlMapping struct {
-	UUID     int    `json:"uuid"`
-	ShortURL string `json:"short_url"`
-	URL      string `json:"original_url"`
-}
-
-// NewFileStorage constructor receives filepath to store data in file and initializes main file storage object
-func NewFileStorage(filepath string, zlog zerolog.Logger) *FileStorage {
+// NewFileStorage constructor receives filePath to store data in file and initializes main file storage object
+func NewFileStorage(filePath fileconf.Config, zlog zerolog.Logger) *FileStorage {
 	return &FileStorage{
-		urlMapping: urlMapping{},
+		m:          memory.NewMemStorage(),
+		urlMapping: model.URL{},
 		lastUUID:   lastUUID{},
-		filePath:   filepath,
+		filePath:   filePath,
 		zlog:       zlog,
 		mu:         sync.Mutex{},
 	}
+}
+
+// Load reads data from JSON file into maps
+func (fs *FileStorage) Load() error {
+	shortURLMap, err := fs.LoadFile()
+	if err != nil {
+		return err
+	}
+
+	err = fs.m.Load(shortURLMap)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Get method is used to get URL (link) from the map
+func (fs *FileStorage) Get(ctx context.Context, shortURL string) (string, error) {
+	slug, err := fs.m.Get(ctx, shortURL)
+	if err != nil {
+		return "", err
+	}
+
+	return slug, nil
+}
+
+// Save is a method used to save short url and original url
+func (fs *FileStorage) Save(ctx context.Context, shortURL string, url string) error {
+	if err := fs.m.Save(ctx, shortURL, url); err != nil {
+		return err
+	}
+
+	if err := fs.Store(shortURL, url); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Store is method to store UUID, short_url and original_url in jsonl format
@@ -45,11 +83,11 @@ func (fs *FileStorage) Store(shortURL string, url string) error {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
-	fs.urlMapping.UUID = fs.lastUUID.UUID + 1
+	fs.urlMapping.ID = fs.lastUUID.UUID + 1
 	fs.urlMapping.ShortURL = shortURL
-	fs.urlMapping.URL = url
+	fs.urlMapping.OriginalURL = url
 
-	file, err := os.OpenFile(fs.filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	file, err := os.OpenFile(fs.filePath.FilePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		panic(err)
 	}
@@ -77,7 +115,7 @@ func (fs *FileStorage) Store(shortURL string, url string) error {
 // LoadFile loads json file storage and returns maps for memory storage
 func (fs *FileStorage) LoadFile() (shortURLMap map[string]string, err error) {
 	shortURLMap = make(map[string]string)
-	file, err := os.ReadFile(fs.filePath)
+	file, err := os.ReadFile(fs.filePath.FilePath)
 
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -107,8 +145,8 @@ func (fs *FileStorage) LoadFile() (shortURLMap map[string]string, err error) {
 			continue
 		}
 
-		shortURLMap[fs.urlMapping.ShortURL] = fs.urlMapping.URL
-		fs.zlog.Debug().Msgf("read: UUID=%d, ShortURL=%s, URL=%s", fs.urlMapping.UUID, fs.urlMapping.ShortURL, fs.urlMapping.URL)
+		shortURLMap[fs.urlMapping.ShortURL] = fs.urlMapping.OriginalURL
+		fs.zlog.Debug().Msgf("read: UUID=%d, ShortURL=%s, URL=%s", fs.urlMapping.ID, fs.urlMapping.ShortURL, fs.urlMapping.OriginalURL)
 
 	}
 

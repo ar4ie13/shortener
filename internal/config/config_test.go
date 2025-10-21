@@ -194,7 +194,6 @@ func TestNewConfig(t *testing.T) {
 				t.Errorf("InitConfig() expected %q, got %q", tt.expected.shortURL, cfg.ShortURLTemplate)
 
 			}
-
 		})
 	}
 }

@@ -1,10 +1,12 @@
 package memory
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"github.com/ar4ie13/shortener/internal/service"
 	"testing"
+
+	"github.com/ar4ie13/shortener/internal/service"
 )
 
 func TestNewMemStorage(t *testing.T) {
@@ -106,7 +108,7 @@ func TestMemory_Get(t *testing.T) {
 				slugMemStore: tt.fields.slugMemStore,
 				urlMemStore:  tt.fields.urlMemStore,
 			}
-			got, err := repo.Get(tt.args.slug)
+			got, err := repo.Get(context.Background(), tt.args.slug)
 			if got != tt.want {
 				t.Errorf("Get() got = %v, want %v", got, tt.want)
 			}
@@ -212,7 +214,7 @@ func TestMemory_Save(t *testing.T) {
 				urlMemStore:  tt.fields.urlMemStore,
 			}
 
-			if err := repo.Save(tt.args.slug, tt.args.url); (err != nil) != tt.wantErr || !errors.Is(err, tt.wantErrName) {
+			if err := repo.Save(context.Background(), tt.args.slug, tt.args.url); (err != nil) != tt.wantErr || !errors.Is(err, tt.wantErrName) {
 				fmt.Println(err, tt.wantErrName)
 				t.Errorf("Save() error = %s, wantErr %s", err, tt.wantErrName)
 			}

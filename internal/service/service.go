@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -12,7 +13,7 @@ var (
 	ErrNotFound      = errors.New("not found")
 	ErrURLExist      = errors.New("URL already exist")
 	ErrEmptyIDorURL  = errors.New("ID or URL cannot be empty")
-	ErrShortURLExist = errors.New("ID already exist")
+	ErrShortURLExist = errors.New("ShortURL already exist")
 
 	ErrEmptyURL         = errors.New("URL template cannot be empty")
 	ErrWrongHTTPScheme  = errors.New("URL template must use http or https scheme")
@@ -30,8 +31,8 @@ const (
 
 // Repository interface used to interact with repository package to store or retrieve values
 type Repository interface {
-	Get(shortURL string) (string, error)
-	Save(shortURL string, url string) error
+	Get(ctx context.Context, shortURL string) (string, error)
+	Save(ctx context.Context, shortURL string, url string) error
 }
 
 // Service is a main object of the package that implements Repository interface
@@ -45,23 +46,21 @@ func NewService(r Repository) *Service {
 }
 
 // GetURL method gets URL by provided id
-func (s Service) GetURL(shortURL string) (string, error) {
+func (s Service) GetURL(ctx context.Context, shortURL string) (string, error) {
 	if shortURL == "" {
 		return "", errEmptyID
 	}
 
-	idURL, err := s.r.Get(shortURL)
-	if err != nil {
-		if errors.Is(err, ErrNotFound) || errors.Is(err, ErrEmptyIDorURL) {
-			return "", fmt.Errorf("failed to get URL: %w", err)
-		}
+	getShortUrl, err := s.r.Get(ctx, shortURL)
+	if getShortUrl == "" || err != nil {
+		return "", fmt.Errorf("failed to get URL: %w", err)
 	}
 
-	return idURL, nil
+	return getShortUrl, nil
 }
 
 // GenerateShortURL generates shortURL for non-existent URL and stores it in the Repository
-func (s Service) GenerateShortURL(urlLink string) (slug string, err error) {
+func (s Service) GenerateShortURL(ctx context.Context, urlLink string) (slug string, err error) {
 
 	urlLink = strings.TrimRight(urlLink, "/")
 
@@ -95,7 +94,7 @@ func (s Service) GenerateShortURL(urlLink string) (slug string, err error) {
 			continue
 		}
 
-		err = s.r.Save(slug, urlLink)
+		err = s.r.Save(ctx, slug, urlLink)
 
 		if err == nil {
 			return slug, nil

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -14,8 +15,8 @@ import (
 
 // Service interface interacts with service package
 type Service interface {
-	GetURL(id string) (string, error)
-	GenerateShortURL(url string) (slug string, err error)
+	GetURL(ctx context.Context, id string) (string, error)
+	GenerateShortURL(ctx context.Context, url string) (slug string, err error)
 }
 
 // Config interface gets configuration flags from config package
@@ -54,7 +55,7 @@ func (h Handler) ListenAndServe() error {
 			router.Post("/shorten", h.postURLJSON)
 		})
 	})
-	h.zlog.Info().Msgf("Listening on %v\nURL Template: %v\nLog Level: %v", h.c.GetLocalServerAddr(), h.c.GetShortURLTemplate(), h.c.GetLogLevel())
+	h.zlog.Info().Msgf("listening on %v\nURL Template: %v\nLog Level: %v", h.c.GetLocalServerAddr(), h.c.GetShortURLTemplate(), h.c.GetLogLevel())
 
 	if err := http.ListenAndServe(h.c.GetLocalServerAddr(), router); err != nil {
 		return err
@@ -71,13 +72,14 @@ func (h Handler) postURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := h.s.GenerateShortURL(string(body))
+	id, err := h.s.GenerateShortURL(r.Context(), string(body))
 	if err != nil {
 		if errors.Is(err, service.ErrEmptyURL) || errors.Is(err, service.ErrInvalidURLFormat) ||
 			errors.Is(err, service.ErrWrongHTTPScheme) || errors.Is(err, service.ErrMustIncludeHost) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		w.WriteHeader(http.StatusInternalServerError)
 		h.zlog.Error().Msgf("Failed to generate short url: %v", err)
 		return
@@ -107,17 +109,19 @@ func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(buf)
 	if err = dec.Decode(&req); err != nil {
 		h.zlog.Debug().Msgf("cannot decode request JSON body: %v", h.zlog.Err(err))
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	id, err := h.s.GenerateShortURL(req.LongURL)
+	id, err := h.s.GenerateShortURL(r.Context(), req.LongURL)
 	if err != nil {
 		if errors.Is(err, service.ErrEmptyURL) || errors.Is(err, service.ErrInvalidURLFormat) ||
 			errors.Is(err, service.ErrWrongHTTPScheme) || errors.Is(err, service.ErrMustIncludeHost) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		w.WriteHeader(http.StatusInternalServerError)
 		h.zlog.Error().Msgf("Failed to generate short url: %v", err)
 		return
@@ -132,6 +136,7 @@ func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
 	enc := json.NewEncoder(w)
 	if err = enc.Encode(resp); err != nil {
 		h.zlog.Debug().Msgf("error encoding response: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -143,7 +148,7 @@ func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
 func (h Handler) getShortURLByID(w http.ResponseWriter, r *http.Request) {
 
 	id := chi.URLParam(r, "id")
-	url, err := h.s.GetURL(id)
+	url, err := h.s.GetURL(r.Context(), id)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -156,6 +161,7 @@ func (h Handler) getShortURLByID(w http.ResponseWriter, r *http.Request) {
 func (h Handler) checkPostgresConnection(w http.ResponseWriter, r *http.Request) {
 	err := h.c.CheckPostgresConnection()
 	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

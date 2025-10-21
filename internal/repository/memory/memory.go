@@ -1,6 +1,8 @@
 package memory
 
 import (
+	"context"
+
 	"github.com/ar4ie13/shortener/internal/service"
 )
 
@@ -25,7 +27,7 @@ func NewMemStorage() *MemStorage {
 }
 
 // Get method is used to get URL (link) from the repository map
-func (repo *MemStorage) Get(shortURL string) (string, error) {
+func (repo *MemStorage) Get(_ context.Context, shortURL string) (string, error) {
 	if v, ok := repo.slugMemStore[shortURL]; ok {
 		return v, nil
 	}
@@ -52,7 +54,7 @@ func (repo *MemStorage) existsShortURL(shortURL string) bool {
 }
 
 // Save saves the slug(shortURL):URL pair in the map
-func (repo *MemStorage) Save(shortURL string, url string) error {
+func (repo *MemStorage) Save(_ context.Context, shortURL string, url string) error {
 
 	if shortURL == "" || url == "" {
 		return service.ErrEmptyIDorURL
