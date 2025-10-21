@@ -51,12 +51,12 @@ func (s Service) GetURL(ctx context.Context, shortURL string) (string, error) {
 		return "", errEmptyID
 	}
 
-	getShortUrl, err := s.r.Get(ctx, shortURL)
-	if getShortUrl == "" || err != nil {
+	getShortURL, err := s.r.Get(ctx, shortURL)
+	if getShortURL == "" || err != nil {
 		return "", fmt.Errorf("failed to get URL: %w", err)
 	}
 
-	return getShortUrl, nil
+	return getShortURL, nil
 }
 
 // GenerateShortURL generates shortURL for non-existent URL and stores it in the Repository
