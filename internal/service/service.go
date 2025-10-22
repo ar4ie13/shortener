@@ -158,6 +158,7 @@ func (s Service) SaveBatch(ctx context.Context, batch []model.URL) ([]model.URL,
 	}
 
 	return result, nil
+	
 }
 
 // generateShortURL is a sub-function for SaveURL
