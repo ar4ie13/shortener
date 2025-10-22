@@ -92,9 +92,9 @@ func (repo *MemStorage) SaveBatch(_ context.Context, batch []model.URL) error {
 		case batch[i].ShortURL == "" || batch[i].OriginalURL == "":
 			return service.ErrEmptyShortURLorURL
 		case repo.existsURL(batch[i].OriginalURL):
-			return fmt.Errorf("%w :%s", service.ErrURLExist, batch[i].OriginalURL)
+			return fmt.Errorf("%w: %s", service.ErrURLExist, batch[i].OriginalURL)
 		case repo.existsShortURL(batch[i].ShortURL):
-			return fmt.Errorf("%w :%s", service.ErrShortURLExist, batch[i].ShortURL)
+			return fmt.Errorf("%w: %s", service.ErrShortURLExist, batch[i].ShortURL)
 		}
 		result[i] = batch[i]
 	}

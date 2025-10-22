@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -146,12 +147,14 @@ func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
 func (h Handler) getShortURLByID(w http.ResponseWriter, r *http.Request) {
 
 	id := chi.URLParam(r, "id")
+	fmt.Println("handler, slug:", id)
 	url, err := h.s.GetURL(r.Context(), id)
 	if err != nil {
+		fmt.Println("handler bad get")
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
+	fmt.Println("handler good get")
 	w.Header().Set("Location", url)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
