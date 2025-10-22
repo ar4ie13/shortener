@@ -124,8 +124,9 @@ func TestMemory_Get(t *testing.T) {
 func TestMemory_Save(t *testing.T) {
 
 	type fields struct {
-		slugMemStore map[string]string
-		urlMemStore  map[string]string
+		SlugMemStore map[string]string
+		URLMemStore  map[string]string
+		UUIDMemStore map[string]string
 	}
 	type args struct {
 		slug string
@@ -141,12 +142,13 @@ func TestMemory_Save(t *testing.T) {
 		{
 			name: "Valid slug and URL",
 			fields: fields{
-				slugMemStore: SlugMemStore{
+				SlugMemStore: SlugMemStore{
 					"abc123": "https://example.com",
 				},
-				urlMemStore: URLMemStore{
+				URLMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
+				UUIDMemStore: map[string]string{},
 			},
 			args: args{
 				slug: "abc12",
@@ -158,12 +160,13 @@ func TestMemory_Save(t *testing.T) {
 		{
 			name: "Valid slug and existent URL",
 			fields: fields{
-				slugMemStore: SlugMemStore{
+				SlugMemStore: SlugMemStore{
 					"abc123": "https://example.com",
 				},
-				urlMemStore: URLMemStore{
+				URLMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
+				UUIDMemStore: map[string]string{},
 			},
 			args: args{
 				slug: "abc12",
@@ -175,12 +178,13 @@ func TestMemory_Save(t *testing.T) {
 		{
 			name: "Empty slug and existent URL",
 			fields: fields{
-				slugMemStore: SlugMemStore{
+				SlugMemStore: SlugMemStore{
 					"abc123": "https://example.com",
 				},
-				urlMemStore: URLMemStore{
+				URLMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
+				UUIDMemStore: map[string]string{},
 			},
 			args: args{
 				slug: "",
@@ -192,12 +196,13 @@ func TestMemory_Save(t *testing.T) {
 		{
 			name: "Valid slug and empty URL",
 			fields: fields{
-				slugMemStore: SlugMemStore{
+				SlugMemStore: SlugMemStore{
 					"abc123": "https://example.com",
 				},
-				urlMemStore: URLMemStore{
+				URLMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
+				UUIDMemStore: map[string]string{},
 			},
 			args: args{
 				slug: "abc",
@@ -210,8 +215,9 @@ func TestMemory_Save(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &MemStorage{
-				SlugMemStore: tt.fields.slugMemStore,
-				URLMemStore:  tt.fields.urlMemStore,
+				SlugMemStore: tt.fields.SlugMemStore,
+				URLMemStore:  tt.fields.URLMemStore,
+				UUIDMemStore: tt.fields.UUIDMemStore,
 			}
 
 			if err := repo.Save(context.Background(), tt.args.slug, tt.args.url); (err != nil) != tt.wantErr || !errors.Is(err, tt.wantErrName) {
@@ -224,8 +230,9 @@ func TestMemory_Save(t *testing.T) {
 
 func TestMemory_existsURL(t *testing.T) {
 	type fields struct {
-		slugMemStore map[string]string
-		urlMemStore  map[string]string
+		SlugMemStore map[string]string
+		URLMemStore  map[string]string
+		UUIDMemStore map[string]string
 	}
 	type args struct {
 		url string
@@ -239,10 +246,10 @@ func TestMemory_existsURL(t *testing.T) {
 		{
 			name: "Exists URL",
 			fields: fields{
-				slugMemStore: SlugMemStore{
+				SlugMemStore: SlugMemStore{
 					"abc123": "https://example.com",
 				},
-				urlMemStore: URLMemStore{
+				URLMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
 			},
@@ -254,10 +261,10 @@ func TestMemory_existsURL(t *testing.T) {
 		{
 			name: "Not existsURL URL",
 			fields: fields{
-				slugMemStore: SlugMemStore{
+				SlugMemStore: SlugMemStore{
 					"abc123": "https://example.com",
 				},
-				urlMemStore: URLMemStore{
+				URLMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
 			},
@@ -270,8 +277,8 @@ func TestMemory_existsURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &MemStorage{
-				SlugMemStore: tt.fields.slugMemStore,
-				URLMemStore:  tt.fields.urlMemStore,
+				SlugMemStore: tt.fields.SlugMemStore,
+				URLMemStore:  tt.fields.URLMemStore,
 			}
 			if got := repo.existsURL(tt.args.url); got != tt.want {
 				t.Errorf("existsURL() = %v, want %v", got, tt.want)
