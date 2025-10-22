@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 
@@ -145,16 +144,12 @@ func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
 
 // getShortURLByID handles get requests and redirects to the URL by provided shortURL if it is found in Repository
 func (h Handler) getShortURLByID(w http.ResponseWriter, r *http.Request) {
-
 	id := chi.URLParam(r, "id")
-	fmt.Println("handler, slug:", id)
 	url, err := h.s.GetURL(r.Context(), id)
 	if err != nil {
-		fmt.Println("handler bad get")
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	fmt.Println("handler good get")
 	w.Header().Set("Location", url)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
@@ -211,7 +206,7 @@ func (h Handler) postURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for i := range serviceResp {
-		resp = append(resp, BatchResponse{UUID: serviceResp[i].UUID, ShortURL: serviceResp[i].ShortURL})
+		resp = append(resp, BatchResponse{UUID: serviceResp[i].UUID, ShortURL: h.c.GetShortURLTemplate() + "/" + serviceResp[i].ShortURL})
 	}
 
 	w.Header().Set("Content-Type", "application/json")
