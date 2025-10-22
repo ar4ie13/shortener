@@ -142,3 +142,39 @@ func (fs *FileStorage) LoadFile() error {
 
 	return nil
 }
+
+func (fs *FileStorage) SaveBatch(ctx context.Context, batch []model.URL) error {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	err := fs.m.SaveBatch(ctx, batch)
+	if err != nil {
+		return err
+	}
+
+	file, err := os.OpenFile(fs.filePath.FilePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	for i := range batch {
+		fs.urlMapping.UUID = batch[i].UUID
+		fs.urlMapping.ShortURL = batch[i].ShortURL
+		fs.urlMapping.OriginalURL = batch[i].OriginalURL
+
+		jsonLine, err := json.Marshal(fs.urlMapping)
+		if err != nil {
+			panic(err)
+		}
+		_, err = file.Write(jsonLine)
+		if err != nil {
+			panic(err)
+		}
+		_, err = file.WriteString("\n")
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	return nil
+}

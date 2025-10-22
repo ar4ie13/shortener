@@ -8,12 +8,12 @@ type ShortURLResp struct {
 	ShortURL string `json:"result"`
 }
 
-type BathRequest struct {
+type BatchRequest struct {
 	UUID    string `json:"correlation_id"`
 	LongURL string `json:"original_url"`
 }
 
-type BathResponse struct {
+type BatchResponse struct {
 	UUID     string `json:"correlation_id"`
 	ShortURL string `json:"short_url"`
 }

@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/ar4ie13/shortener/internal/model"
 	"github.com/ar4ie13/shortener/internal/service/internal/mockery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -39,6 +40,18 @@ func (m *HandyMockRepository) Save(_ context.Context, id string, url string) err
 		}
 	}
 	m.urls[id] = url
+	return nil
+}
+func (m *HandyMockRepository) SaveBatch(_ context.Context, batch []model.URL) error {
+	for i := range batch {
+		if batch[i].ShortURL == "" || batch[i].OriginalURL == "" {
+			return ErrEmptyShortURLorURL
+		}
+		if m.err != nil {
+			return m.err
+		}
+
+	}
 	return nil
 }
 
@@ -136,10 +149,10 @@ func TestService_GenerateShortURL(t *testing.T) {
 			s := Service{
 				&r,
 			}
-			_, err := s.GenerateShortURL(context.Background(), tt.args.url)
+			_, err := s.SaveURL(context.Background(), tt.args.url)
 			if ((err != nil) != tt.wantErr) || (tt.wantErr && !errors.Is(err, tt.wantErrMsg)) {
 				t.Errorf("%v", !errors.Is(err, tt.wantErrMsg))
-				t.Errorf("GenerateShortURL() error = %v, wantErr %v", err, tt.wantErrMsg)
+				t.Errorf("SaveURL() error = %v, wantErr %v", err, tt.wantErrMsg)
 				return
 			}
 

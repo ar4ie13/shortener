@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ar4ie13/shortener/internal/model"
 	"github.com/ar4ie13/shortener/internal/repository/db/postgresql/config"
 	"github.com/ar4ie13/shortener/internal/service"
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/rs/zerolog"
@@ -119,4 +122,36 @@ func (db *DB) Save(ctx context.Context, shortURL string, originalURL string) err
 	db.zlog.Debug().Msgf("saved URL: %s", shortURL)
 
 	return nil
+}
+
+func (db *DB) SaveBatch(ctx context.Context, batch []model.URL) error {
+	query := `INSERT INTO urls (uuid, short_url, original_url) VALUES (@uuid, @shortURL, @originalURL)`
+
+	insertBatch := &pgx.Batch{}
+	for _, v := range batch {
+		args := pgx.NamedArgs{
+			"uuid":        v.UUID,
+			"shortURL":    v.ShortURL,
+			"originalURL": v.OriginalURL,
+		}
+		insertBatch.Queue(query, args)
+	}
+
+	results := db.pool.SendBatch(ctx, insertBatch)
+	defer results.Close()
+
+	for _, v := range batch {
+		_, err := results.Exec()
+		if err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+				return fmt.Errorf("error while saving URL %s: %w", v.OriginalURL, err)
+
+			}
+
+			return fmt.Errorf("unable to insert row: %w", err)
+		}
+	}
+
+	return results.Close()
 }

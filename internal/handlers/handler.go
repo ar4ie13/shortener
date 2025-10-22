@@ -5,10 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 
+	"github.com/ar4ie13/shortener/internal/model"
 	"github.com/ar4ie13/shortener/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
@@ -17,7 +17,8 @@ import (
 // Service interface interacts with service package
 type Service interface {
 	GetURL(ctx context.Context, id string) (string, error)
-	GenerateShortURL(ctx context.Context, url string) (slug string, err error)
+	SaveURL(ctx context.Context, url string) (slug string, err error)
+	SaveBatch(ctx context.Context, batch []model.URL) ([]model.URL, error)
 }
 
 // Config interface gets configuration flags from config package
@@ -74,7 +75,7 @@ func (h Handler) postURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := h.s.GenerateShortURL(r.Context(), string(body))
+	id, err := h.s.SaveURL(r.Context(), string(body))
 	if err != nil {
 		if errors.Is(err, service.ErrEmptyURL) || errors.Is(err, service.ErrInvalidURLFormat) ||
 			errors.Is(err, service.ErrWrongHTTPScheme) || errors.Is(err, service.ErrMustIncludeHost) {
@@ -113,8 +114,9 @@ func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	h.zlog.Debug().Msg("request decoded successfully")
 
-	id, err := h.s.GenerateShortURL(r.Context(), req.LongURL)
+	id, err := h.s.SaveURL(r.Context(), req.LongURL)
 	if err != nil {
 		if errors.Is(err, service.ErrEmptyURL) || errors.Is(err, service.ErrInvalidURLFormat) ||
 			errors.Is(err, service.ErrWrongHTTPScheme) || errors.Is(err, service.ErrMustIncludeHost) {
@@ -177,8 +179,8 @@ func (h Handler) postURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 
 	h.zlog.Debug().Msg("decoding batch request")
 	var (
-		req  []BathRequest
-		resp []BathResponse
+		req  []BatchRequest
+		resp []BatchResponse
 	)
 
 	dec := json.NewDecoder(buf)
@@ -187,29 +189,27 @@ func (h Handler) postURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
+	h.zlog.Debug().Msg("batch request decoded successfully")
+	var URLs []model.URL
 	for i := range req {
-		var res BathResponse
-		fmt.Println(req[i])
-		id, err := h.s.GenerateShortURL(r.Context(), req[i].LongURL)
-		if err != nil {
-			if errors.Is(err, service.ErrEmptyURL) || errors.Is(err, service.ErrInvalidURLFormat) ||
-				errors.Is(err, service.ErrWrongHTTPScheme) || errors.Is(err, service.ErrMustIncludeHost) {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			h.zlog.Error().Msgf("Failed to generate short url: %v", err)
+
+		URLs = append(URLs, model.URL{UUID: req[i].UUID, OriginalURL: req[i].LongURL})
+	}
+
+	serviceResp, err := h.s.SaveBatch(r.Context(), URLs)
+	if err != nil {
+		if errors.Is(err, service.ErrEmptyURL) || errors.Is(err, service.ErrInvalidURLFormat) ||
+			errors.Is(err, service.ErrWrongHTTPScheme) || errors.Is(err, service.ErrMustIncludeHost) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		res = BathResponse{
-			UUID:     req[i].UUID,
-			ShortURL: h.c.GetShortURLTemplate() + "/" + id,
-		}
-		resp = append(resp, res)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.zlog.Error().Msgf("Failed to generate short url: %v", err)
+		return
 	}
-	fmt.Printf("req: %v\n", req)
-	fmt.Printf("resp: %v\n", resp)
+	for i := range serviceResp {
+		resp = append(resp, BatchResponse{UUID: serviceResp[i].UUID, ShortURL: serviceResp[i].ShortURL})
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

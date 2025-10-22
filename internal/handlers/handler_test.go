@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ar4ie13/shortener/internal/model"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -76,7 +77,7 @@ func (m *MockService) GetURL(_ context.Context, id string) (string, error) {
 }
 
 // GenerateShortURL mocks the Service GenerateShortURL method
-func (m *MockService) GenerateShortURL(_ context.Context, url string) (string, error) {
+func (m *MockService) SaveURL(_ context.Context, url string) (string, error) {
 	if m.err != nil {
 		return "", m.err
 	}
@@ -87,6 +88,10 @@ func (m *MockService) GenerateShortURL(_ context.Context, url string) (string, e
 
 	}
 	return "abc123", nil
+}
+
+func (m *MockService) SaveBatch(_ context.Context, batch []model.URL) ([]model.URL, error) {
+	return batch, nil
 }
 
 func testRequest(t *testing.T, ts *httptest.Server, method,
