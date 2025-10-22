@@ -10,10 +10,10 @@ import (
 )
 
 var (
-	ErrNotFound      = errors.New("not found")
-	ErrURLExist      = errors.New("URL already exist")
-	ErrEmptyIDorURL  = errors.New("ID or URL cannot be empty")
-	ErrShortURLExist = errors.New("ShortURL already exist")
+	ErrNotFound           = errors.New("not found")
+	ErrURLExist           = errors.New("URL already exist")
+	ErrEmptyShortURLorURL = errors.New("ID or URL cannot be empty")
+	ErrShortURLExist      = errors.New("ShortURL already exist")
 
 	ErrEmptyURL         = errors.New("URL template cannot be empty")
 	ErrWrongHTTPScheme  = errors.New("URL template must use http or https scheme")

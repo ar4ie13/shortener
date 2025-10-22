@@ -2,33 +2,40 @@ package memory
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ar4ie13/shortener/internal/service"
+	"github.com/google/uuid"
 )
 
-// slugMemStore stores slug:URL
-type slugMemStore map[string]string
+// SlugMemStore stores slug:URL
+type SlugMemStore map[string]string
 
-// urlMemStore stores URL:slug
-type urlMemStore map[string]string
+// URLMemStore stores URL:slug
+type URLMemStore map[string]string
+
+// UUIDMemStore stores uuid:slug
+type UUIDMemStore map[string]string
 
 // MemStorage is the main object for the package repository
 type MemStorage struct {
-	slugMemStore
-	urlMemStore
+	SlugMemStore
+	URLMemStore
+	UUIDMemStore
 }
 
 // NewMemStorage is a constructor for MemStorage object
 func NewMemStorage() *MemStorage {
 	return &MemStorage{
-		slugMemStore: make(map[string]string),
-		urlMemStore:  make(map[string]string),
+		SlugMemStore: make(map[string]string),
+		URLMemStore:  make(map[string]string),
+		UUIDMemStore: make(map[string]string),
 	}
 }
 
 // Get method is used to get URL (link) from the repository map
 func (repo *MemStorage) Get(_ context.Context, shortURL string) (string, error) {
-	if v, ok := repo.slugMemStore[shortURL]; ok {
+	if v, ok := repo.SlugMemStore[shortURL]; ok {
 		return v, nil
 	}
 
@@ -37,7 +44,7 @@ func (repo *MemStorage) Get(_ context.Context, shortURL string) (string, error) 
 
 // existsURL check if URL exist in the map
 func (repo *MemStorage) existsURL(url string) bool {
-	if _, ok := repo.urlMemStore[url]; ok {
+	if _, ok := repo.URLMemStore[url]; ok {
 		return true
 	}
 
@@ -46,40 +53,31 @@ func (repo *MemStorage) existsURL(url string) bool {
 
 // existsShortURL check if URL exist in the map
 func (repo *MemStorage) existsShortURL(shortURL string) bool {
-	if _, ok := repo.slugMemStore[shortURL]; ok {
+	if _, ok := repo.SlugMemStore[shortURL]; ok {
 		return true
 	}
 
 	return false
 }
 
-// Save saves the slug(shortURL):URL pair in the map
+// Save saves shortURL, URL and UUID to the correlated maps
 func (repo *MemStorage) Save(_ context.Context, shortURL string, url string) error {
 
 	if shortURL == "" || url == "" {
-		return service.ErrEmptyIDorURL
+		return service.ErrEmptyShortURLorURL
 	}
 
 	if repo.existsURL(url) {
-		return service.ErrURLExist
+		return fmt.Errorf("%w :%s", service.ErrURLExist, url)
 	}
 
 	if repo.existsShortURL(shortURL) {
-		return service.ErrShortURLExist
+		return fmt.Errorf("%w :%s", service.ErrShortURLExist, shortURL)
 	}
 
-	repo.slugMemStore[shortURL] = url
-	repo.urlMemStore[url] = shortURL
-
-	return nil
-}
-
-// Load gets maps from file storage into memory storage maps
-func (repo *MemStorage) Load(shortURLMap map[string]string) error {
-	for k, v := range shortURLMap {
-		repo.slugMemStore[k] = shortURLMap[k]
-		repo.urlMemStore[v] = k
-	}
+	repo.SlugMemStore[shortURL] = url
+	repo.URLMemStore[url] = shortURL
+	repo.UUIDMemStore[shortURL] = uuid.New().String()
 
 	return nil
 }

@@ -65,13 +65,22 @@ func (db *DB) Get(ctx context.Context, shortURL string) (originalURL string, err
 
 	err = row.Scan(&originalURL)
 	if err != nil {
-		return "", fmt.Errorf("failed to scan a response row: %w", err)
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			return "", service.ErrNotFound
+		default:
+			return "", fmt.Errorf("failed to scan a response row: %w", err)
+		}
 	}
 
 	return originalURL, nil
 }
 
 func (db *DB) Save(ctx context.Context, shortURL string, originalURL string) error {
+
+	if shortURL == "" || originalURL == "" {
+		return service.ErrEmptyShortURLorURL
+	}
 
 	const (
 		queryStmtInsert        = `INSERT INTO urls(short_url, original_url) VALUES ($1, $2)`
@@ -91,7 +100,7 @@ func (db *DB) Save(ctx context.Context, shortURL string, originalURL string) err
 		return fmt.Errorf("failed to check the URL: %w", err)
 	}
 	if check == originalURL {
-		return service.ErrURLExist
+		return fmt.Errorf("%w :%s", service.ErrURLExist, originalURL)
 	}
 
 	row = db.pool.QueryRow(ctx, queryStmtCheckShortURL, shortURL)
@@ -99,7 +108,7 @@ func (db *DB) Save(ctx context.Context, shortURL string, originalURL string) err
 		return fmt.Errorf("failed to check the ShortURL: %w", err)
 	}
 	if check == shortURL {
-		return service.ErrShortURLExist
+		return fmt.Errorf("%w :%s", service.ErrShortURLExist, shortURL)
 	}
 
 	_, err := db.pool.Exec(ctx, queryStmtInsert, shortURL, originalURL)
@@ -111,26 +120,3 @@ func (db *DB) Save(ctx context.Context, shortURL string, originalURL string) err
 
 	return nil
 }
-
-// "host=localhost port=5432 user=shortener password=shortener dbname=shortener sslmode=disable"
-
-/*
-func CheckConn() error {
-	ps := fmt.Sprint("host=localhost port=5432 user=videos password=userpassword dbname=videos sslmode=disable")
-
-	db, err := sql.Open("pgx", ps)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-	// ...
-
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	if err = db.PingContext(ctx); err != nil {
-		panic(err)
-	}
-	return nil
-}
-
-*/

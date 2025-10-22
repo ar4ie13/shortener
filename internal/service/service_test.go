@@ -28,7 +28,7 @@ func (m *HandyMockRepository) Get(_ context.Context, id string) (string, error) 
 
 func (m *HandyMockRepository) Save(_ context.Context, id string, url string) error {
 	if id == "" || url == "" {
-		return ErrEmptyIDorURL
+		return ErrEmptyShortURLorURL
 	}
 	if m.err != nil {
 		return m.err
@@ -249,7 +249,7 @@ func TestService_GetURL_Mockery(t *testing.T) {
 			assert.Equal(t, tt.expectedURL, result)
 			if tt.expectedErr != nil {
 				require.Error(t, err)
-				if errors.Is(tt.expectedErr, ErrNotFound) || errors.Is(tt.expectedErr, ErrEmptyIDorURL) {
+				if errors.Is(tt.expectedErr, ErrNotFound) || errors.Is(tt.expectedErr, ErrEmptyShortURLorURL) {
 					assert.Contains(t, err.Error(), "failed to get URL")
 				}
 				assert.ErrorIs(t, err, tt.expectedErr)
