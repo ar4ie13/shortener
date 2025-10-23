@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ar4ie13/shortener/internal/model"
@@ -54,7 +55,32 @@ func (db *DB) Close() error {
 	return nil
 }
 
-func (db *DB) Get(ctx context.Context, shortURL string) (originalURL string, err error) {
+func (db *DB) GetShortURL(ctx context.Context, originalURL string) (shortURL string, err error) {
+
+	const queryStmt = `SELECT short_url FROM urls WHERE original_url = $1`
+
+	start := time.Now()
+	defer func() {
+		elapsed := time.Since(start)
+		db.zlog.Debug().Msgf("request execution duration: %s", elapsed)
+	}()
+
+	row := db.pool.QueryRow(ctx, queryStmt, originalURL)
+
+	err = row.Scan(&shortURL)
+	if err != nil {
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			return "", service.ErrNotFound
+		default:
+			return "", fmt.Errorf("failed to scan a response row: %w", err)
+		}
+	}
+
+	return shortURL, nil
+}
+
+func (db *DB) GetURL(ctx context.Context, shortURL string) (originalURL string, err error) {
 
 	const queryStmt = `SELECT original_url FROM urls WHERE short_url = $1`
 
@@ -97,25 +123,17 @@ func (db *DB) Save(ctx context.Context, shortURL string, originalURL string) err
 		db.zlog.Debug().Msgf("request execution duration: %s", elapsed)
 	}()
 
-	var check string
-	row := db.pool.QueryRow(ctx, queryStmtCheckURL, originalURL)
-	if err := row.Scan(&check); err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return fmt.Errorf("failed to check the URL: %w", err)
-	}
-	if check == originalURL {
-		return fmt.Errorf("%w :%s", service.ErrURLExist, originalURL)
-	}
-
-	row = db.pool.QueryRow(ctx, queryStmtCheckShortURL, shortURL)
-	if err := row.Scan(&check); err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return fmt.Errorf("failed to check the ShortURL: %w", err)
-	}
-	if check == shortURL {
-		return fmt.Errorf("%w :%s", service.ErrShortURLExist, shortURL)
-	}
-
 	_, err := db.pool.Exec(ctx, queryStmtInsert, shortURL, originalURL)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+			switch {
+			case strings.Contains(err.Error(), "urls_original_url_key"):
+				return fmt.Errorf("error while saving URL %s: %w", originalURL, service.ErrURLExist)
+			case strings.Contains(err.Error(), "urls_short_url_key"):
+				return fmt.Errorf("error while saving URL %s: %w", shortURL, service.ErrShortURLExist)
+			}
+		}
 		return fmt.Errorf("failed to save URL: %w", err)
 	}
 

@@ -43,7 +43,7 @@ package filestorage
 //
 //func (m *MockOS) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
 //	args := m.Called(name, flag, perm)
-//	return args.Get(0).(*os.File), args.Error(1)
+//	return args.GetURL(0).(*os.File), args.Error(1)
 //}
 //
 //func TestNewFileStorage(t *testing.T) {

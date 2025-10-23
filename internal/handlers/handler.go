@@ -75,23 +75,34 @@ func (h Handler) postURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := h.s.SaveURL(r.Context(), string(body))
+	slug, err := h.s.SaveURL(r.Context(), string(body))
 	if err != nil {
-		if errors.Is(err, service.ErrEmptyURL) || errors.Is(err, service.ErrInvalidURLFormat) ||
-			errors.Is(err, service.ErrWrongHTTPScheme) || errors.Is(err, service.ErrMustIncludeHost) {
+		switch {
+		case errors.Is(err, service.ErrURLExist):
+			w.WriteHeader(http.StatusConflict)
+			_, err = w.Write([]byte(h.c.GetShortURLTemplate() + "/" + slug))
+			if err != nil {
+				h.zlog.Error().Err(err).Msg("failed to write response body")
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+			return
+		case errors.Is(err, service.ErrEmptyURL) || errors.Is(err, service.ErrInvalidURLFormat) ||
+			errors.Is(err, service.ErrWrongHTTPScheme) || errors.Is(err, service.ErrMustIncludeHost):
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.zlog.Error().Msgf("Failed to generate short url: %v", err)
 		return
 	}
 
-	host := h.c.GetShortURLTemplate() + "/" + id
+	host := h.c.GetShortURLTemplate() + "/" + slug
 	w.WriteHeader(http.StatusCreated)
 	if _, err = w.Write([]byte(host)); err != nil {
 		h.zlog.Error().Msgf("Failed to write response: %v", err)
 	}
+	return
 }
 
 func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
@@ -116,20 +127,36 @@ func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
 	}
 	h.zlog.Debug().Msg("request decoded successfully")
 
-	id, err := h.s.SaveURL(r.Context(), req.LongURL)
+	slug, err := h.s.SaveURL(r.Context(), req.LongURL)
 	if err != nil {
-		if errors.Is(err, service.ErrEmptyURL) || errors.Is(err, service.ErrInvalidURLFormat) ||
-			errors.Is(err, service.ErrWrongHTTPScheme) || errors.Is(err, service.ErrMustIncludeHost) {
+		switch {
+		case errors.Is(err, service.ErrURLExist):
+			resp := ShortURLResp{
+				ShortURL: h.c.GetShortURLTemplate() + "/" + slug,
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+			enc := json.NewEncoder(w)
+			if err = enc.Encode(resp); err != nil {
+				h.zlog.Debug().Msgf("error encoding response: %v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			return
+		case errors.Is(err, service.ErrEmptyURL) || errors.Is(err, service.ErrInvalidURLFormat) ||
+			errors.Is(err, service.ErrWrongHTTPScheme) || errors.Is(err, service.ErrMustIncludeHost):
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.zlog.Error().Msgf("Failed to generate short url: %v", err)
 		return
 	}
 
 	resp := ShortURLResp{
-		ShortURL: h.c.GetShortURLTemplate() + "/" + id,
+		ShortURL: h.c.GetShortURLTemplate() + "/" + slug,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -140,6 +167,7 @@ func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	return
 }
 
 // getShortURLByID handles get requests and redirects to the URL by provided shortURL if it is found in Repository

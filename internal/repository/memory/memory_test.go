@@ -108,12 +108,12 @@ func TestMemory_Get(t *testing.T) {
 				SlugMemStore: tt.fields.slugMemStore,
 				URLMemStore:  tt.fields.urlMemStore,
 			}
-			got, err := repo.Get(context.Background(), tt.args.slug)
+			got, err := repo.GetURL(context.Background(), tt.args.slug)
 			if got != tt.want {
-				t.Errorf("Get() got = %v, want %v", got, tt.want)
+				t.Errorf("GetURL() got = %v, want %v", got, tt.want)
 			}
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Get() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("GetURL() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 

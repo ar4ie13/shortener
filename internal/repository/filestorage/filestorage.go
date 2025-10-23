@@ -44,9 +44,19 @@ func (fs *FileStorage) Load() error {
 	return nil
 }
 
-// Get method is used to get URL (link) from the map
-func (fs *FileStorage) Get(ctx context.Context, shortURL string) (string, error) {
-	slug, err := fs.m.Get(ctx, shortURL)
+// GetURL method is used to get URL (link) from the map
+func (fs *FileStorage) GetURL(ctx context.Context, shortURL string) (string, error) {
+	urlLink, err := fs.m.GetURL(ctx, shortURL)
+	if err != nil {
+		return "", err
+	}
+
+	return urlLink, nil
+}
+
+// GetShortURL method is used to get URL (link) from the map
+func (fs *FileStorage) GetShortURL(ctx context.Context, originalURL string) (string, error) {
+	slug, err := fs.m.GetShortURL(ctx, originalURL)
 	if err != nil {
 		return "", err
 	}

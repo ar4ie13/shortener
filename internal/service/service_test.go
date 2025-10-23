@@ -19,12 +19,21 @@ type HandyMockRepository struct {
 	err  error
 }
 
-func (m *HandyMockRepository) Get(_ context.Context, id string) (string, error) {
+func (m *HandyMockRepository) GetURL(_ context.Context, id string) (string, error) {
 	url, exists := m.urls[id]
 	if !exists {
 		return "", ErrNotFound
 	}
 	return url, nil
+}
+
+func (m *HandyMockRepository) GetShortURL(_ context.Context, urllink string) (string, error) {
+	for k, v := range m.urls {
+		if urllink == v {
+			return k, nil
+		}
+	}
+	return "", ErrNotFound
 }
 
 func (m *HandyMockRepository) Save(_ context.Context, id string, url string) error {
@@ -254,7 +263,7 @@ func TestService_GetURL_Mockery(t *testing.T) {
 			service := Service{r: mockRepo}
 
 			if tt.shouldCallRepo {
-				mockRepo.On("Get", context.Background(), tt.shortURL).Return(tt.mockReturnURL, tt.mockReturnErr)
+				mockRepo.On("GetURL", context.Background(), tt.shortURL).Return(tt.mockReturnURL, tt.mockReturnErr)
 			}
 
 			result, err := service.GetURL(context.Background(), tt.shortURL)
@@ -271,9 +280,9 @@ func TestService_GetURL_Mockery(t *testing.T) {
 			}
 
 			if tt.shouldCallRepo {
-				mockRepo.AssertCalled(t, "Get", context.Background(), tt.shortURL)
+				mockRepo.AssertCalled(t, "GetURL", context.Background(), tt.shortURL)
 			} else {
-				mockRepo.AssertNotCalled(t, "Get", mock.Anything)
+				mockRepo.AssertNotCalled(t, "GetURL", mock.Anything)
 			}
 		})
 	}

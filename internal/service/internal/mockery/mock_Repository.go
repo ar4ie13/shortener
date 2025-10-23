@@ -22,12 +22,69 @@ func (_m *MockRepository) EXPECT() *MockRepository_Expecter {
 	return &MockRepository_Expecter{mock: &_m.Mock}
 }
 
-// Get provides a mock function with given fields: ctx, shortURL
-func (_m *MockRepository) Get(ctx context.Context, shortURL string) (string, error) {
+// GetShortURL provides a mock function with given fields: ctx, originalURL
+func (_m *MockRepository) GetShortURL(ctx context.Context, originalURL string) (string, error) {
+	ret := _m.Called(ctx, originalURL)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetShortURL")
+	}
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
+		return rf(ctx, originalURL)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) string); ok {
+		r0 = rf(ctx, originalURL)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, originalURL)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepository_GetShortURL_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetShortURL'
+type MockRepository_GetShortURL_Call struct {
+	*mock.Call
+}
+
+// GetShortURL is a helper method to define mock.On call
+//   - ctx context.Context
+//   - originalURL string
+func (_e *MockRepository_Expecter) GetShortURL(ctx interface{}, originalURL interface{}) *MockRepository_GetShortURL_Call {
+	return &MockRepository_GetShortURL_Call{Call: _e.mock.On("GetShortURL", ctx, originalURL)}
+}
+
+func (_c *MockRepository_GetShortURL_Call) Run(run func(ctx context.Context, originalURL string)) *MockRepository_GetShortURL_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockRepository_GetShortURL_Call) Return(_a0 string, _a1 error) *MockRepository_GetShortURL_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepository_GetShortURL_Call) RunAndReturn(run func(context.Context, string) (string, error)) *MockRepository_GetShortURL_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetURL provides a mock function with given fields: ctx, shortURL
+func (_m *MockRepository) GetURL(ctx context.Context, shortURL string) (string, error) {
 	ret := _m.Called(ctx, shortURL)
 
 	if len(ret) == 0 {
-		panic("no return value specified for Get")
+		panic("no return value specified for GetURL")
 	}
 
 	var r0 string
@@ -50,31 +107,31 @@ func (_m *MockRepository) Get(ctx context.Context, shortURL string) (string, err
 	return r0, r1
 }
 
-// MockRepository_Get_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Get'
-type MockRepository_Get_Call struct {
+// MockRepository_GetURL_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetURL'
+type MockRepository_GetURL_Call struct {
 	*mock.Call
 }
 
-// Get is a helper method to define mock.On call
+// GetURL is a helper method to define mock.On call
 //   - ctx context.Context
 //   - shortURL string
-func (_e *MockRepository_Expecter) Get(ctx interface{}, shortURL interface{}) *MockRepository_Get_Call {
-	return &MockRepository_Get_Call{Call: _e.mock.On("Get", ctx, shortURL)}
+func (_e *MockRepository_Expecter) GetURL(ctx interface{}, shortURL interface{}) *MockRepository_GetURL_Call {
+	return &MockRepository_GetURL_Call{Call: _e.mock.On("GetURL", ctx, shortURL)}
 }
 
-func (_c *MockRepository_Get_Call) Run(run func(ctx context.Context, shortURL string)) *MockRepository_Get_Call {
+func (_c *MockRepository_GetURL_Call) Run(run func(ctx context.Context, shortURL string)) *MockRepository_GetURL_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
 
-func (_c *MockRepository_Get_Call) Return(_a0 string, _a1 error) *MockRepository_Get_Call {
+func (_c *MockRepository_GetURL_Call) Return(_a0 string, _a1 error) *MockRepository_GetURL_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockRepository_Get_Call) RunAndReturn(run func(context.Context, string) (string, error)) *MockRepository_Get_Call {
+func (_c *MockRepository_GetURL_Call) RunAndReturn(run func(context.Context, string) (string, error)) *MockRepository_GetURL_Call {
 	_c.Call.Return(run)
 	return _c
 }

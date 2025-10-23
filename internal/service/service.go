@@ -33,7 +33,8 @@ const (
 
 // Repository interface used to interact with repository package to store or retrieve values
 type Repository interface {
-	Get(ctx context.Context, shortURL string) (string, error)
+	GetURL(ctx context.Context, shortURL string) (string, error)
+	GetShortURL(ctx context.Context, originalURL string) (string, error)
 	Save(ctx context.Context, shortURL string, url string) error
 	SaveBatch(ctx context.Context, batch []model.URL) error
 }
@@ -54,12 +55,12 @@ func (s Service) GetURL(ctx context.Context, shortURL string) (string, error) {
 		return "", errEmptyID
 	}
 
-	getShortURL, err := s.r.Get(ctx, shortURL)
-	if getShortURL == "" || err != nil {
+	getURL, err := s.r.GetURL(ctx, shortURL)
+	if getURL == "" || err != nil {
 		return "", fmt.Errorf("failed to get URL: %w", err)
 	}
 
-	return getShortURL, nil
+	return getURL, nil
 }
 
 // SaveURL generates shortURL for non-existent URL and stores it in the Repository
@@ -104,7 +105,11 @@ func (s Service) SaveURL(ctx context.Context, urlLink string) (slug string, err 
 		}
 
 		if errors.Is(err, ErrURLExist) {
-			return "", err
+			slug, err = s.r.GetShortURL(ctx, urlLink)
+			if err != nil {
+				return "", ErrNotFound
+			}
+			return slug, ErrURLExist
 		}
 
 		if attempt == 3 {
@@ -158,7 +163,7 @@ func (s Service) SaveBatch(ctx context.Context, batch []model.URL) ([]model.URL,
 	}
 
 	return result, nil
-	
+
 }
 
 // generateShortURL is a sub-function for SaveURL
