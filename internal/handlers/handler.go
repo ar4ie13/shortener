@@ -102,7 +102,6 @@ func (h Handler) postURL(w http.ResponseWriter, r *http.Request) {
 	if _, err = w.Write([]byte(host)); err != nil {
 		h.zlog.Error().Msgf("Failed to write response: %v", err)
 	}
-	return
 }
 
 func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
@@ -167,7 +166,6 @@ func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	return
 }
 
 // getShortURLByID handles get requests and redirects to the URL by provided shortURL if it is found in Repository
