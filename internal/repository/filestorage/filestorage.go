@@ -153,6 +153,7 @@ func (fs *FileStorage) LoadFile() error {
 	return nil
 }
 
+// SaveBatch used to save batch of short urls and URL to the file storage
 func (fs *FileStorage) SaveBatch(ctx context.Context, batch []model.URL) error {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()

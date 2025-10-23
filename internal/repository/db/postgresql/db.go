@@ -18,11 +18,13 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// DB is a main postgres repository object
 type DB struct {
 	pool *pgxpool.Pool
 	zlog zerolog.Logger
 }
 
+// NewDB construct postgres DB object
 func NewDB(ctx context.Context, cfg config.Config, zlog zerolog.Logger) (*DB, error) {
 	pool, err := initPool(ctx, cfg)
 	if err != nil {
@@ -34,12 +36,12 @@ func NewDB(ctx context.Context, cfg config.Config, zlog zerolog.Logger) (*DB, er
 	}, nil
 }
 
+// initPool initializes pgx connection pool
 func initPool(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
 	poolCfg, err := pgxpool.ParseConfig(cfg.DatabaseDSN)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse the DSN: %w", err)
 	}
-	//poolCfg.ConnConfig.Tracer = &queryTracer{}
 	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize a connection pool: %w", err)
@@ -50,11 +52,13 @@ func initPool(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
+// Close closed pgx pool
 func (db *DB) Close() error {
 	db.pool.Close()
 	return nil
 }
 
+// GetShortURL gets short_url from db by provided URL
 func (db *DB) GetShortURL(ctx context.Context, originalURL string) (shortURL string, err error) {
 
 	const queryStmt = `SELECT short_url FROM urls WHERE original_url = $1`
@@ -80,6 +84,7 @@ func (db *DB) GetShortURL(ctx context.Context, originalURL string) (shortURL str
 	return shortURL, nil
 }
 
+// GetURL gets URL by provided shortURL
 func (db *DB) GetURL(ctx context.Context, shortURL string) (originalURL string, err error) {
 
 	const queryStmt = `SELECT original_url FROM urls WHERE short_url = $1`
@@ -105,6 +110,7 @@ func (db *DB) GetURL(ctx context.Context, shortURL string) (originalURL string, 
 	return originalURL, nil
 }
 
+// Save saves tuple with shortURL, URL and UUID
 func (db *DB) Save(ctx context.Context, shortURL string, originalURL string) error {
 
 	if shortURL == "" || originalURL == "" {
@@ -142,6 +148,7 @@ func (db *DB) Save(ctx context.Context, shortURL string, originalURL string) err
 	return nil
 }
 
+// SaveBatch performs bulk insert to postgres database
 func (db *DB) SaveBatch(ctx context.Context, batch []model.URL) error {
 	query := `INSERT INTO urls (uuid, short_url, original_url) VALUES (@uuid, @shortURL, @originalURL)`
 

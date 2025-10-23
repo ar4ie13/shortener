@@ -43,7 +43,7 @@ func (repo *MemStorage) GetURL(_ context.Context, shortURL string) (string, erro
 	return "", service.ErrNotFound
 }
 
-// GetShortURL method is used to get URL (link) from the repository map
+// GetShortURL method is used to get shortURL from the repository map
 func (repo *MemStorage) GetShortURL(_ context.Context, originalURL string) (string, error) {
 	if v, ok := repo.URLMemStore[originalURL]; ok {
 		return v, nil

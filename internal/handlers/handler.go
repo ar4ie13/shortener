@@ -180,6 +180,7 @@ func (h Handler) getShortURLByID(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
+// checkPostgresConnection used in /ping GET request
 func (h Handler) checkPostgresConnection(w http.ResponseWriter, _ *http.Request) {
 	err := h.c.CheckPostgresConnection()
 	if err != nil {
@@ -189,6 +190,7 @@ func (h Handler) checkPostgresConnection(w http.ResponseWriter, _ *http.Request)
 	w.WriteHeader(http.StatusOK)
 }
 
+// postURLJSONBatch handles bath request in JSON
 func (h Handler) postURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Content-Type") != "application/json" {
 		w.WriteHeader(http.StatusBadRequest)
