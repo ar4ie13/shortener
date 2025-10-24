@@ -1,6 +1,8 @@
 package config
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"flag"
 	"fmt"
@@ -8,9 +10,15 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
+
+	pgconf "github.com/ar4ie13/shortener/internal/repository/db/postgresql/config"
+	fileconf "github.com/ar4ie13/shortener/internal/repository/filestorage/config"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 var (
@@ -27,13 +35,15 @@ type Config struct {
 	LocalServerAddr  string
 	ShortURLTemplate ShortURLTemplate
 	LogLevel         LogLevel
-	FileStorage      string
+	FilePath         fileconf.Config
+	PostgresDSN      pgconf.Config
 }
 
 // NewConfig constructor for Config
 func NewConfig() *Config {
 	c := &Config{}
 	c.InitConfig()
+
 	return c
 }
 
@@ -95,12 +105,14 @@ func (c *Config) InitConfig() {
 	defaultServerAddr := "localhost:8080"
 	defaultURL := "http://localhost:8080"
 	defaultLogLevel := LogLevel{Level: zerolog.InfoLevel}
-	defaultFileStorage := "./storage.jsonl"
+	defaultFileStorage := ""
+	defaultDatabaseDSN := ""
 
 	flag.StringVar(&c.LocalServerAddr, "a", defaultServerAddr, "local server address")
 	flag.Var(&c.ShortURLTemplate, "b", "short url template")
 	flag.Var(&c.LogLevel, "l", "log level (debug, info, warn, error, fatal, panic)")
-	flag.StringVar(&c.FileStorage, "f", defaultFileStorage, "file storage path")
+	flag.StringVar(&c.FilePath.FilePath, "f", defaultFileStorage, "file storage path")
+	flag.StringVar(&c.PostgresDSN.DatabaseDSN, "d", defaultDatabaseDSN, "database DSN")
 
 	if err := c.ShortURLTemplate.Set(defaultURL); err != nil {
 		log.Fatal().Err(err).Msg("Failed to set default URL")
@@ -137,8 +149,27 @@ func (c *Config) InitConfig() {
 	}
 
 	if fileStorage := os.Getenv("FILE_STORAGE_PATH"); fileStorage != "" {
-		c.FileStorage = fileStorage
+		c.FilePath.FilePath = fileStorage
 	}
+
+	if databaseDSN := os.Getenv("DATABASE_DSN"); databaseDSN != "" {
+		c.PostgresDSN.DatabaseDSN = databaseDSN
+	}
+}
+
+// CheckPostgresConnection validates the connection to PostgreSQL database
+func (c *Config) CheckPostgresConnection(ctx context.Context) error {
+	db, err := sql.Open("pgx", c.PostgresDSN.DatabaseDSN)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	ctxPg, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if err = db.PingContext(ctxPg); err != nil {
+		return err
+	}
+	return nil
 }
 
 // GetLocalServerAddr returns localserver address string
@@ -154,9 +185,4 @@ func (c *Config) GetShortURLTemplate() string {
 // GetLogLevel returns logging level. Used in logger.NewLogger constructor.
 func (c *Config) GetLogLevel() zerolog.Level {
 	return c.LogLevel.Level
-}
-
-// GetFileStorage return filepath for json storage of repos urlLib
-func (c *Config) GetFileStorage() string {
-	return c.FileStorage
 }

@@ -1,11 +1,8 @@
-package handler
+package handlers
 
 import (
+	"context"
 	"errors"
-	"github.com/go-chi/chi/v5"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +10,12 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/ar4ie13/shortener/internal/model"
+	"github.com/go-chi/chi/v5"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // This part will test two main handlers for POST and GET methods
@@ -22,6 +25,10 @@ type MockConfig struct {
 	LocalServerAddr  string
 	ShortURLTemplate string
 	LogLevel         zerolog.Level
+}
+
+func (c *MockConfig) CheckPostgresConnection(ctx context.Context) error {
+	return nil
 }
 
 func (c *MockConfig) GetLocalServerAddr() string {
@@ -58,7 +65,7 @@ func NewLogger(level zerolog.Level) *MockLogger {
 }
 
 // GetURL mocks the Service GetURL method
-func (m *MockService) GetURL(id string) (string, error) {
+func (m *MockService) GetURL(_ context.Context, id string) (string, error) {
 	if m.err != nil {
 		return "", m.err
 	}
@@ -70,7 +77,7 @@ func (m *MockService) GetURL(id string) (string, error) {
 }
 
 // GenerateShortURL mocks the Service GenerateShortURL method
-func (m *MockService) GenerateShortURL(url string) (string, error) {
+func (m *MockService) SaveURL(_ context.Context, url string) (string, error) {
 	if m.err != nil {
 		return "", m.err
 	}
@@ -81,6 +88,10 @@ func (m *MockService) GenerateShortURL(url string) (string, error) {
 
 	}
 	return "abc123", nil
+}
+
+func (m *MockService) SaveBatch(_ context.Context, batch []model.URL) ([]model.URL, error) {
+	return batch, nil
 }
 
 func testRequest(t *testing.T, ts *httptest.Server, method,
@@ -215,7 +226,7 @@ func TestPostURL(t *testing.T) {
 			storageErr:     errors.New("id already exists"),
 			body:           "www.ya.ru",
 			expectedStatus: http.StatusInternalServerError,
-			expectedBody:   "",
+			expectedBody:   "id already exists\n",
 		},
 	}
 
@@ -240,7 +251,7 @@ func TestPostURL(t *testing.T) {
 			// Create response recorder
 			rr := httptest.NewRecorder()
 
-			// Call handler
+			// Call handlers
 			handler.postURL(rr, req)
 
 			// Check status code

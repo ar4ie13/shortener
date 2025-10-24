@@ -1,10 +1,13 @@
 package memory
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"github.com/ar4ie13/shortener/internal/service"
 	"testing"
+
+	"github.com/ar4ie13/shortener/internal/service"
+	"github.com/google/uuid"
 )
 
 func TestNewMemStorage(t *testing.T) {
@@ -19,11 +22,11 @@ func TestNewMemStorage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewMemStorage(); len(got.urlMemStore) != tt.expectedMapLength || len(got.slugMemStore) != tt.expectedMapLength {
+			if got := NewMemStorage(); len(got.URLMemStore) != tt.expectedMapLength || len(got.SlugMemStore) != tt.expectedMapLength {
 				t.Errorf("NewMemStorage() urlLib lenth = %v, want %v", got, tt.expectedMapLength)
 			}
-			if got := NewMemStorage(); got.slugMemStore == nil || got.urlMemStore == nil {
-				t.Errorf("NewMemStorage() slugMemStore or urlMemStore is nil")
+			if got := NewMemStorage(); got.SlugMemStore == nil || got.URLMemStore == nil {
+				t.Errorf("NewMemStorage() SlugMemStore or URLMemStore is nil")
 			}
 			if got := NewMemStorage(); got == nil {
 				t.Errorf("NewMemStorage() struct is nil")
@@ -51,10 +54,10 @@ func TestMemory_Get(t *testing.T) {
 		{
 			name: "Valid slug",
 			fields: fields{
-				slugMemStore: slugMemStore{
+				slugMemStore: SlugMemStore{
 					"abc123": "https://example.com",
 				},
-				urlMemStore: urlMemStore{
+				urlMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
 			},
@@ -68,10 +71,10 @@ func TestMemory_Get(t *testing.T) {
 		{
 			name: "Non-existent slug",
 			fields: fields{
-				slugMemStore: slugMemStore{
+				slugMemStore: SlugMemStore{
 					"abc12": "https://example.com",
 				},
-				urlMemStore: urlMemStore{
+				urlMemStore: URLMemStore{
 					"https://example.com": "abc12",
 				},
 			},
@@ -85,10 +88,10 @@ func TestMemory_Get(t *testing.T) {
 		{
 			name: "Empty input parameter",
 			fields: fields{
-				slugMemStore: slugMemStore{
+				slugMemStore: SlugMemStore{
 					"abc12": "https://example.com",
 				},
-				urlMemStore: urlMemStore{
+				urlMemStore: URLMemStore{
 					"https://example.com": "abc12",
 				},
 			},
@@ -103,15 +106,15 @@ func TestMemory_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &MemStorage{
-				slugMemStore: tt.fields.slugMemStore,
-				urlMemStore:  tt.fields.urlMemStore,
+				SlugMemStore: tt.fields.slugMemStore,
+				URLMemStore:  tt.fields.urlMemStore,
 			}
-			got, err := repo.Get(tt.args.slug)
+			got, err := repo.GetURL(context.Background(), tt.args.slug)
 			if got != tt.want {
-				t.Errorf("Get() got = %v, want %v", got, tt.want)
+				t.Errorf("GetURL() got = %v, want %v", got, tt.want)
 			}
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Get() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("GetURL() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
@@ -122,8 +125,9 @@ func TestMemory_Get(t *testing.T) {
 func TestMemory_Save(t *testing.T) {
 
 	type fields struct {
-		slugMemStore map[string]string
-		urlMemStore  map[string]string
+		SlugMemStore map[string]string
+		URLMemStore  map[string]string
+		UUIDMemStore map[uuid.UUID]string
 	}
 	type args struct {
 		slug string
@@ -139,12 +143,13 @@ func TestMemory_Save(t *testing.T) {
 		{
 			name: "Valid slug and URL",
 			fields: fields{
-				slugMemStore: slugMemStore{
+				SlugMemStore: SlugMemStore{
 					"abc123": "https://example.com",
 				},
-				urlMemStore: urlMemStore{
+				URLMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
+				UUIDMemStore: map[uuid.UUID]string{},
 			},
 			args: args{
 				slug: "abc12",
@@ -156,12 +161,13 @@ func TestMemory_Save(t *testing.T) {
 		{
 			name: "Valid slug and existent URL",
 			fields: fields{
-				slugMemStore: slugMemStore{
+				SlugMemStore: SlugMemStore{
 					"abc123": "https://example.com",
 				},
-				urlMemStore: urlMemStore{
+				URLMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
+				UUIDMemStore: map[uuid.UUID]string{},
 			},
 			args: args{
 				slug: "abc12",
@@ -173,46 +179,49 @@ func TestMemory_Save(t *testing.T) {
 		{
 			name: "Empty slug and existent URL",
 			fields: fields{
-				slugMemStore: slugMemStore{
+				SlugMemStore: SlugMemStore{
 					"abc123": "https://example.com",
 				},
-				urlMemStore: urlMemStore{
+				URLMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
+				UUIDMemStore: map[uuid.UUID]string{},
 			},
 			args: args{
 				slug: "",
 				url:  "https://example.com",
 			},
 			wantErr:     true,
-			wantErrName: service.ErrEmptyIDorURL,
+			wantErrName: service.ErrEmptyShortURLorURL,
 		},
 		{
 			name: "Valid slug and empty URL",
 			fields: fields{
-				slugMemStore: slugMemStore{
+				SlugMemStore: SlugMemStore{
 					"abc123": "https://example.com",
 				},
-				urlMemStore: urlMemStore{
+				URLMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
+				UUIDMemStore: map[uuid.UUID]string{},
 			},
 			args: args{
 				slug: "abc",
 				url:  "",
 			},
 			wantErr:     true,
-			wantErrName: service.ErrEmptyIDorURL,
+			wantErrName: service.ErrEmptyShortURLorURL,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &MemStorage{
-				slugMemStore: tt.fields.slugMemStore,
-				urlMemStore:  tt.fields.urlMemStore,
+				SlugMemStore: tt.fields.SlugMemStore,
+				URLMemStore:  tt.fields.URLMemStore,
+				UUIDMemStore: tt.fields.UUIDMemStore,
 			}
 
-			if err := repo.Save(tt.args.slug, tt.args.url); (err != nil) != tt.wantErr || !errors.Is(err, tt.wantErrName) {
+			if err := repo.Save(context.Background(), tt.args.slug, tt.args.url); (err != nil) != tt.wantErr || !errors.Is(err, tt.wantErrName) {
 				fmt.Println(err, tt.wantErrName)
 				t.Errorf("Save() error = %s, wantErr %s", err, tt.wantErrName)
 			}
@@ -222,8 +231,9 @@ func TestMemory_Save(t *testing.T) {
 
 func TestMemory_existsURL(t *testing.T) {
 	type fields struct {
-		slugMemStore map[string]string
-		urlMemStore  map[string]string
+		SlugMemStore map[string]string
+		URLMemStore  map[string]string
+		UUIDMemStore map[string]string
 	}
 	type args struct {
 		url string
@@ -237,10 +247,10 @@ func TestMemory_existsURL(t *testing.T) {
 		{
 			name: "Exists URL",
 			fields: fields{
-				slugMemStore: slugMemStore{
+				SlugMemStore: SlugMemStore{
 					"abc123": "https://example.com",
 				},
-				urlMemStore: urlMemStore{
+				URLMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
 			},
@@ -252,10 +262,10 @@ func TestMemory_existsURL(t *testing.T) {
 		{
 			name: "Not existsURL URL",
 			fields: fields{
-				slugMemStore: slugMemStore{
+				SlugMemStore: SlugMemStore{
 					"abc123": "https://example.com",
 				},
-				urlMemStore: urlMemStore{
+				URLMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
 			},
@@ -268,8 +278,8 @@ func TestMemory_existsURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &MemStorage{
-				slugMemStore: tt.fields.slugMemStore,
-				urlMemStore:  tt.fields.urlMemStore,
+				SlugMemStore: tt.fields.SlugMemStore,
+				URLMemStore:  tt.fields.URLMemStore,
 			}
 			if got := repo.existsURL(tt.args.url); got != tt.want {
 				t.Errorf("existsURL() = %v, want %v", got, tt.want)
@@ -295,10 +305,10 @@ func TestMemory_existsShortURL(t *testing.T) {
 		{
 			name: "Exists URL",
 			fields: fields{
-				slugMemStore: slugMemStore{
+				slugMemStore: SlugMemStore{
 					"abc123": "https://example.com",
 				},
-				urlMemStore: urlMemStore{
+				urlMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
 			},
@@ -310,10 +320,10 @@ func TestMemory_existsShortURL(t *testing.T) {
 		{
 			name: "Not existsURL URL",
 			fields: fields{
-				slugMemStore: slugMemStore{
+				slugMemStore: SlugMemStore{
 					"abc123": "https://example.com",
 				},
-				urlMemStore: urlMemStore{
+				urlMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
 			},
@@ -326,8 +336,8 @@ func TestMemory_existsShortURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &MemStorage{
-				slugMemStore: tt.fields.slugMemStore,
-				urlMemStore:  tt.fields.urlMemStore,
+				SlugMemStore: tt.fields.slugMemStore,
+				URLMemStore:  tt.fields.urlMemStore,
 			}
 			if got := repo.existsShortURL(tt.args.slug); got != tt.want {
 				t.Errorf("existsShortURL() = %v, want %v", got, tt.want)

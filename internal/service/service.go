@@ -1,18 +1,21 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
 	"net/url"
 	"strings"
+
+	"github.com/ar4ie13/shortener/internal/model"
 )
 
 var (
-	ErrNotFound      = errors.New("not found")
-	ErrURLExist      = errors.New("URL already exist")
-	ErrEmptyIDorURL  = errors.New("ID or URL cannot be empty")
-	ErrShortURLExist = errors.New("ID already exist")
+	ErrNotFound           = errors.New("not found")
+	ErrURLExist           = errors.New("URL already exist")
+	ErrEmptyShortURLorURL = errors.New("ID or URL cannot be empty")
+	ErrShortURLExist      = errors.New("ShortURL already exist")
 
 	ErrEmptyURL         = errors.New("URL template cannot be empty")
 	ErrWrongHTTPScheme  = errors.New("URL template must use http or https scheme")
@@ -30,13 +33,15 @@ const (
 
 // Repository interface used to interact with repository package to store or retrieve values
 type Repository interface {
-	Get(shortURL string) (string, error)
-	Save(shortURL string, url string) error
+	GetURL(ctx context.Context, shortURL string) (string, error)
+	GetShortURL(ctx context.Context, originalURL string) (string, error)
+	Save(ctx context.Context, shortURL string, url string) error
+	SaveBatch(ctx context.Context, batch []model.URL) error
 }
 
 // Service is a main object of the package that implements Repository interface
 type Service struct {
-	r Repository
+	repo Repository
 }
 
 // NewService is a constructor for Service object
@@ -45,23 +50,21 @@ func NewService(r Repository) *Service {
 }
 
 // GetURL method gets URL by provided id
-func (s Service) GetURL(shortURL string) (string, error) {
+func (s Service) GetURL(ctx context.Context, shortURL string) (string, error) {
 	if shortURL == "" {
 		return "", errEmptyID
 	}
 
-	idURL, err := s.r.Get(shortURL)
-	if err != nil {
-		if errors.Is(err, ErrNotFound) || errors.Is(err, ErrEmptyIDorURL) {
-			return "", fmt.Errorf("failed to get URL: %w", err)
-		}
+	getURL, err := s.repo.GetURL(ctx, shortURL)
+	if getURL == "" || err != nil {
+		return "", fmt.Errorf("failed to get URL: %w", err)
 	}
 
-	return idURL, nil
+	return getURL, nil
 }
 
-// GenerateShortURL generates shortURL for non-existent URL and stores it in the Repository
-func (s Service) GenerateShortURL(urlLink string) (slug string, err error) {
+// SaveURL generates shortURL for non-existent URL and stores it in the Repository
+func (s Service) SaveURL(ctx context.Context, urlLink string) (slug string, err error) {
 
 	urlLink = strings.TrimRight(urlLink, "/")
 
@@ -95,14 +98,18 @@ func (s Service) GenerateShortURL(urlLink string) (slug string, err error) {
 			continue
 		}
 
-		err = s.r.Save(slug, urlLink)
+		err = s.repo.Save(ctx, slug, urlLink)
 
 		if err == nil {
 			return slug, nil
 		}
 
 		if errors.Is(err, ErrURLExist) {
-			return "", err
+			slug, err = s.repo.GetShortURL(ctx, urlLink)
+			if err != nil {
+				return "", ErrNotFound
+			}
+			return slug, ErrURLExist
 		}
 
 		if attempt == 3 {
@@ -114,7 +121,52 @@ func (s Service) GenerateShortURL(urlLink string) (slug string, err error) {
 	return "", err
 }
 
-// generateShortURL is a sub-function for GenerateShortURL
+// SaveBatch saves batch of jsonl rows to the repository
+func (s Service) SaveBatch(ctx context.Context, batch []model.URL) ([]model.URL, error) {
+	result := make([]model.URL, len(batch))
+	for i := range batch {
+		slug, err := generateShortURL(shortURLLen)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate short url: %w", err)
+		}
+
+		urlLink := strings.TrimRight(batch[i].OriginalURL, "/")
+
+		if urlLink == "" {
+			return nil, fmt.Errorf("%w: %s", ErrEmptyURL, batch[i].OriginalURL)
+		}
+
+		// Validate the URL format
+		parsedURL, err := url.Parse(batch[i].OriginalURL)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %s", ErrInvalidURLFormat, batch[i].OriginalURL)
+		}
+
+		// Ensure the scheme is http or https
+		if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+			return nil, ErrWrongHTTPScheme
+		}
+
+		// Ensure the host is not empty
+		if parsedURL.Host == "" {
+			return nil, ErrMustIncludeHost
+		}
+		result[i] = model.URL{
+			ShortURL:    slug,
+			OriginalURL: urlLink,
+			UUID:        batch[i].UUID,
+		}
+	}
+
+	err := s.repo.SaveBatch(ctx, result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save batch: %w", err)
+	}
+
+	return result, nil
+}
+
+// generateShortURL is a sub-function for SaveURL
 func generateShortURL(length int) (string, error) {
 	if length <= 0 {
 		return "", errShortURLLength
@@ -127,5 +179,3 @@ func generateShortURL(length int) (string, error) {
 
 	return string(shortURL), nil
 }
-
-var ()

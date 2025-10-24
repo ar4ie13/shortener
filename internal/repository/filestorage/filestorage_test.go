@@ -2,14 +2,19 @@ package filestorage
 
 import (
 	"errors"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"os"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/ar4ie13/shortener/internal/model"
+	fileconf "github.com/ar4ie13/shortener/internal/repository/filestorage/config"
+	"github.com/ar4ie13/shortener/internal/repository/memory"
+	"github.com/google/uuid"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 // MockFile is a mock for os.File
@@ -44,28 +49,35 @@ func (m *MockOS) OpenFile(name string, flag int, perm os.FileMode) (*os.File, er
 
 func TestNewFileStorage(t *testing.T) {
 	type args struct {
-		filepath string
+		m        *memory.MemStorage
+		filePath fileconf.Config
 		zlog     zerolog.Logger
+		mu       sync.Mutex
 	}
 	tests := []struct {
 		name string
-		args args
+		args *args
 		want *FileStorage
 	}{
 		{
 			name: "TestNewFileStorage",
-			args: args{
-				filepath: "./storage.jsonl",
+			args: &args{
+				m: memory.NewMemStorage(),
+				filePath: fileconf.Config{
+					FilePath: "",
+				},
 				zlog: zerolog.New(zerolog.ConsoleWriter{
 					Out:        os.Stdout,
 					TimeFormat: time.RFC3339,
 				}).With().Timestamp().Logger().Level(zerolog.DebugLevel),
+				mu: sync.Mutex{},
 			},
 			want: &FileStorage{
-				urlMapping: urlMapping{},
-				lastUUID:   lastUUID{},
-				filePath:   "./storage.jsonl",
-				zlog: zerolog.New(zerolog.ConsoleWriter{
+				m:          memory.NewMemStorage(),
+				urlMapping: model.URL{},
+				filePath: fileconf.Config{
+					FilePath: "",
+				}, zlog: zerolog.New(zerolog.ConsoleWriter{
 					Out:        os.Stdout,
 					TimeFormat: time.RFC3339,
 				}).With().Timestamp().Logger().Level(zerolog.DebugLevel),
@@ -75,7 +87,7 @@ func TestNewFileStorage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewFileStorage(tt.args.filepath, tt.args.zlog); !reflect.DeepEqual(got, tt.want) {
+			if got := NewFileStorage(tt.args.filePath, tt.args.zlog); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NewFileStorage() = \n%v, \nwant %v", got, tt.want)
 			}
 		})
@@ -160,14 +172,15 @@ func TestFileStorage_Store(t *testing.T) {
 
 			// Create FileStorage with test data
 			storage := &FileStorage{
-				filePath: "test.json",
-				urlMapping: urlMapping{
-					UUID:     0,
-					ShortURL: "",
-					URL:      "",
+				filePath: fileconf.Config{
+					FilePath: ".test.json",
 				},
-				lastUUID: lastUUID{UUID: 1},
-				mu:       sync.Mutex{},
+				urlMapping: model.URL{
+					UUID:        uuid.UUID{},
+					ShortURL:    "",
+					OriginalURL: "",
+				},
+				mu: sync.Mutex{},
 			}
 
 			// Replace os.OpenFile with our mock
@@ -185,12 +198,37 @@ func TestFileStorage_Store(t *testing.T) {
 					assert.NoError(t, err)
 				})
 
-				// Verify UUID was incremented
-				assert.Equal(t, 2, storage.lastUUID.UUID)
-				assert.Equal(t, tt.shortURL, storage.urlMapping.ShortURL)
-				assert.Equal(t, tt.url, storage.urlMapping.URL)
 			}
 
+		})
+	}
+}
+
+func TestRepository_Load(t *testing.T) {
+	type fields struct {
+		m *memory.MemStorage
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		wantErr bool
+	}{
+		{
+			name: "success",
+			fields: fields{
+				m: memory.NewMemStorage(),
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &FileStorage{
+				m: tt.fields.m,
+			}
+			if err := repo.Load(); (err != nil) != tt.wantErr {
+				t.Errorf("Load() error = %v, wantErr %v", err, tt.wantErr)
+			}
 		})
 	}
 }

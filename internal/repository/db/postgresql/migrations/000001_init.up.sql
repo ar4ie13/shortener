@@ -1,0 +1,9 @@
+BEGIN TRANSACTION;
+
+CREATE TABLE urls (
+    uuid UUID PRIMARY KEY DEFAULT (gen_random_uuid()),
+    short_url VARCHAR(255) UNIQUE NOT NULL,
+    original_url VARCHAR UNIQUE NOT NULL
+);
+
+COMMIT;

@@ -1,32 +1,51 @@
 package memory
 
 import (
+	"context"
+	"fmt"
+
+	"github.com/ar4ie13/shortener/internal/model"
 	"github.com/ar4ie13/shortener/internal/service"
+	"github.com/google/uuid"
 )
 
-// slugMemStore stores slug:URL
-type slugMemStore map[string]string
+// SlugMemStore stores slug:URL
+type SlugMemStore map[string]string
 
-// urlMemStore stores URL:slug
-type urlMemStore map[string]string
+// URLMemStore stores URL:slug
+type URLMemStore map[string]string
+
+// UUIDMemStore stores UUID:slug
+type UUIDMemStore map[uuid.UUID]string
 
 // MemStorage is the main object for the package repository
 type MemStorage struct {
-	slugMemStore
-	urlMemStore
+	SlugMemStore
+	URLMemStore
+	UUIDMemStore
 }
 
 // NewMemStorage is a constructor for MemStorage object
 func NewMemStorage() *MemStorage {
 	return &MemStorage{
-		slugMemStore: make(map[string]string),
-		urlMemStore:  make(map[string]string),
+		SlugMemStore: make(map[string]string),
+		URLMemStore:  make(map[string]string),
+		UUIDMemStore: make(map[uuid.UUID]string),
 	}
 }
 
-// Get method is used to get URL (link) from the repository map
-func (repo *MemStorage) Get(shortURL string) (string, error) {
-	if v, ok := repo.slugMemStore[shortURL]; ok {
+// GetURL method is used to get URL (link) from the repository map
+func (repo *MemStorage) GetURL(_ context.Context, shortURL string) (string, error) {
+	if v, ok := repo.SlugMemStore[shortURL]; ok {
+		return v, nil
+	}
+
+	return "", service.ErrNotFound
+}
+
+// GetShortURL method is used to get shortURL from the repository map
+func (repo *MemStorage) GetShortURL(_ context.Context, originalURL string) (string, error) {
+	if v, ok := repo.URLMemStore[originalURL]; ok {
 		return v, nil
 	}
 
@@ -35,7 +54,7 @@ func (repo *MemStorage) Get(shortURL string) (string, error) {
 
 // existsURL check if URL exist in the map
 func (repo *MemStorage) existsURL(url string) bool {
-	if _, ok := repo.urlMemStore[url]; ok {
+	if _, ok := repo.URLMemStore[url]; ok {
 		return true
 	}
 
@@ -44,39 +63,54 @@ func (repo *MemStorage) existsURL(url string) bool {
 
 // existsShortURL check if URL exist in the map
 func (repo *MemStorage) existsShortURL(shortURL string) bool {
-	if _, ok := repo.slugMemStore[shortURL]; ok {
+	if _, ok := repo.SlugMemStore[shortURL]; ok {
 		return true
 	}
 
 	return false
 }
 
-// Save saves the slug(shortURL):URL pair in the map
-func (repo *MemStorage) Save(shortURL string, url string) error {
+// Save saves shortURL, URL and UUID to the correlated maps
+func (repo *MemStorage) Save(_ context.Context, shortURL string, url string) error {
 
 	if shortURL == "" || url == "" {
-		return service.ErrEmptyIDorURL
+		return service.ErrEmptyShortURLorURL
 	}
 
 	if repo.existsURL(url) {
-		return service.ErrURLExist
+		return fmt.Errorf("%w :%s", service.ErrURLExist, url)
 	}
 
 	if repo.existsShortURL(shortURL) {
-		return service.ErrShortURLExist
+		return fmt.Errorf("%w :%s", service.ErrShortURLExist, shortURL)
 	}
 
-	repo.slugMemStore[shortURL] = url
-	repo.urlMemStore[url] = shortURL
+	repo.SlugMemStore[shortURL] = url
+	repo.URLMemStore[url] = shortURL
+	repo.UUIDMemStore[uuid.New()] = shortURL
 
 	return nil
 }
 
-// Load gets maps from file storage into memory storage maps
-func (repo *MemStorage) Load(shortURLMap map[string]string) error {
-	for k, v := range shortURLMap {
-		repo.slugMemStore[k] = shortURLMap[k]
-		repo.urlMemStore[v] = k
+// SaveBatch saves slice of shortURL, URL and UUID to the correlated maps
+func (repo *MemStorage) SaveBatch(_ context.Context, batch []model.URL) error {
+
+	result := make([]model.URL, len(batch))
+	for i := range batch {
+		switch {
+		case batch[i].ShortURL == "" || batch[i].OriginalURL == "":
+			return service.ErrEmptyShortURLorURL
+		case repo.existsURL(batch[i].OriginalURL):
+			return fmt.Errorf("%w: %s", service.ErrURLExist, batch[i].OriginalURL)
+		case repo.existsShortURL(batch[i].ShortURL):
+			return fmt.Errorf("%w: %s", service.ErrShortURLExist, batch[i].ShortURL)
+		}
+		result[i] = batch[i]
+	}
+	for i := range result {
+		repo.SlugMemStore[result[i].ShortURL] = batch[i].OriginalURL
+		repo.URLMemStore[batch[i].OriginalURL] = batch[i].ShortURL
+		repo.UUIDMemStore[batch[i].UUID] = batch[i].ShortURL
 	}
 
 	return nil
