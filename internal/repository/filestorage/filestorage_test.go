@@ -173,7 +173,7 @@ func TestFileStorage_Store(t *testing.T) {
 			// Create FileStorage with test data
 			storage := &FileStorage{
 				filePath: fileconf.Config{
-					FilePath: ".test.json",
+					FilePath: "../../../storage.jsonl",
 				},
 				urlMapping: model.URL{
 					UUID:        uuid.UUID{},

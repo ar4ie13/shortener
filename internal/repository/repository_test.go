@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"reflect"
 	"testing"
@@ -50,7 +49,6 @@ func TestNewRepository(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := NewRepository(context.Background(), tt.args.fileconf, tt.args.pgcfg, tt.args.zlog)
-			fmt.Println(got, err)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewRepository() error = %v, wantErr %v", err, tt.wantErr)
 				return
