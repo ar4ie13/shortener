@@ -164,9 +164,9 @@ func (c *Config) CheckPostgresConnection(ctx context.Context) error {
 		return err
 	}
 	defer db.Close()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctxPg, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	if err = db.PingContext(ctx); err != nil {
+	if err = db.PingContext(ctxPg); err != nil {
 		return err
 	}
 	return nil
