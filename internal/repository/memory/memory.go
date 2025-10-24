@@ -16,7 +16,7 @@ type SlugMemStore map[string]string
 type URLMemStore map[string]string
 
 // UUIDMemStore stores UUID:slug
-type UUIDMemStore map[string]string
+type UUIDMemStore map[uuid.UUID]string
 
 // MemStorage is the main object for the package repository
 type MemStorage struct {
@@ -30,7 +30,7 @@ func NewMemStorage() *MemStorage {
 	return &MemStorage{
 		SlugMemStore: make(map[string]string),
 		URLMemStore:  make(map[string]string),
-		UUIDMemStore: make(map[string]string),
+		UUIDMemStore: make(map[uuid.UUID]string),
 	}
 }
 
@@ -87,7 +87,7 @@ func (repo *MemStorage) Save(_ context.Context, shortURL string, url string) err
 
 	repo.SlugMemStore[shortURL] = url
 	repo.URLMemStore[url] = shortURL
-	repo.UUIDMemStore[uuid.New().String()] = shortURL
+	repo.UUIDMemStore[uuid.New()] = shortURL
 
 	return nil
 }

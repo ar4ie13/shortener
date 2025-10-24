@@ -43,13 +43,7 @@ type Config struct {
 func NewConfig() *Config {
 	c := &Config{}
 	c.InitConfig()
-	// TODO: Add this when required to check connection when service starts
-	/*
-		if err := c.CheckPostgresConnection(); err != nil {
-			log.Fatal().Err(err).Msg("failed to connect to postgresql")
-		}
 
-	*/
 	return c
 }
 
@@ -163,9 +157,8 @@ func (c *Config) InitConfig() {
 	}
 }
 
-// CheckPostgresConnection TODO: Add this when required to check when service starts
 // CheckPostgresConnection validates the connection to PostgreSQL database
-func (c *Config) CheckPostgresConnection() error {
+func (c *Config) CheckPostgresConnection(ctx context.Context) error {
 	db, err := sql.Open("pgx", c.PostgresDSN.DatabaseDSN)
 	if err != nil {
 		return err

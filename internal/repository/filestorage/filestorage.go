@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"sync"
 
@@ -82,27 +83,27 @@ func (fs *FileStorage) Store(shortURL string, url string) error {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
-	fs.urlMapping.UUID = uuid.New().String()
+	fs.urlMapping.UUID = uuid.New()
 	fs.urlMapping.ShortURL = shortURL
 	fs.urlMapping.OriginalURL = url
 
 	file, err := os.OpenFile(fs.filePath.FilePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("cannot open file: %w", err)
 	}
 	defer file.Close()
 
 	jsonLine, err := json.Marshal(fs.urlMapping)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("cannot marshal json: %w", err)
 	}
 	_, err = file.Write(jsonLine)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("cannot write to file: %w", err)
 	}
 	_, err = file.WriteString("\n")
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("cannot write to file: %w", err)
 	}
 
 	return nil
@@ -164,7 +165,7 @@ func (fs *FileStorage) SaveBatch(ctx context.Context, batch []model.URL) error {
 
 	file, err := os.OpenFile(fs.filePath.FilePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("cannot open file: %w", err)
 	}
 	defer file.Close()
 
@@ -175,15 +176,15 @@ func (fs *FileStorage) SaveBatch(ctx context.Context, batch []model.URL) error {
 
 		jsonLine, err := json.Marshal(fs.urlMapping)
 		if err != nil {
-			panic(err)
+			return fmt.Errorf("cannot marshal json: %w", err)
 		}
 		_, err = file.Write(jsonLine)
 		if err != nil {
-			panic(err)
+			return fmt.Errorf("cannot write to file: %w", err)
 		}
 		_, err = file.WriteString("\n")
 		if err != nil {
-			panic(err)
+			return fmt.Errorf("cannot write to file: %w", err)
 		}
 	}
 

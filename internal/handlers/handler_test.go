@@ -27,7 +27,7 @@ type MockConfig struct {
 	LogLevel         zerolog.Level
 }
 
-func (c *MockConfig) CheckPostgresConnection() error {
+func (c *MockConfig) CheckPostgresConnection(ctx context.Context) error {
 	return nil
 }
 

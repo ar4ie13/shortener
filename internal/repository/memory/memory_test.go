@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ar4ie13/shortener/internal/service"
+	"github.com/google/uuid"
 )
 
 func TestNewMemStorage(t *testing.T) {
@@ -126,7 +127,7 @@ func TestMemory_Save(t *testing.T) {
 	type fields struct {
 		SlugMemStore map[string]string
 		URLMemStore  map[string]string
-		UUIDMemStore map[string]string
+		UUIDMemStore map[uuid.UUID]string
 	}
 	type args struct {
 		slug string
@@ -148,7 +149,7 @@ func TestMemory_Save(t *testing.T) {
 				URLMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
-				UUIDMemStore: map[string]string{},
+				UUIDMemStore: map[uuid.UUID]string{},
 			},
 			args: args{
 				slug: "abc12",
@@ -166,7 +167,7 @@ func TestMemory_Save(t *testing.T) {
 				URLMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
-				UUIDMemStore: map[string]string{},
+				UUIDMemStore: map[uuid.UUID]string{},
 			},
 			args: args{
 				slug: "abc12",
@@ -184,7 +185,7 @@ func TestMemory_Save(t *testing.T) {
 				URLMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
-				UUIDMemStore: map[string]string{},
+				UUIDMemStore: map[uuid.UUID]string{},
 			},
 			args: args{
 				slug: "",
@@ -202,7 +203,7 @@ func TestMemory_Save(t *testing.T) {
 				URLMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
-				UUIDMemStore: map[string]string{},
+				UUIDMemStore: map[uuid.UUID]string{},
 			},
 			args: args{
 				slug: "abc",

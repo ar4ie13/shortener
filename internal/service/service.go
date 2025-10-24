@@ -41,7 +41,7 @@ type Repository interface {
 
 // Service is a main object of the package that implements Repository interface
 type Service struct {
-	r Repository
+	repo Repository
 }
 
 // NewService is a constructor for Service object
@@ -55,7 +55,7 @@ func (s Service) GetURL(ctx context.Context, shortURL string) (string, error) {
 		return "", errEmptyID
 	}
 
-	getURL, err := s.r.GetURL(ctx, shortURL)
+	getURL, err := s.repo.GetURL(ctx, shortURL)
 	if getURL == "" || err != nil {
 		return "", fmt.Errorf("failed to get URL: %w", err)
 	}
@@ -98,14 +98,14 @@ func (s Service) SaveURL(ctx context.Context, urlLink string) (slug string, err 
 			continue
 		}
 
-		err = s.r.Save(ctx, slug, urlLink)
+		err = s.repo.Save(ctx, slug, urlLink)
 
 		if err == nil {
 			return slug, nil
 		}
 
 		if errors.Is(err, ErrURLExist) {
-			slug, err = s.r.GetShortURL(ctx, urlLink)
+			slug, err = s.repo.GetShortURL(ctx, urlLink)
 			if err != nil {
 				return "", ErrNotFound
 			}
@@ -121,6 +121,7 @@ func (s Service) SaveURL(ctx context.Context, urlLink string) (slug string, err 
 	return "", err
 }
 
+// SaveBatch saves batch of jsonl rows to the repository
 func (s Service) SaveBatch(ctx context.Context, batch []model.URL) ([]model.URL, error) {
 	result := make([]model.URL, len(batch))
 	for i := range batch {
@@ -157,13 +158,12 @@ func (s Service) SaveBatch(ctx context.Context, batch []model.URL) ([]model.URL,
 		}
 	}
 
-	err := s.r.SaveBatch(ctx, result)
+	err := s.repo.SaveBatch(ctx, result)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save batch: %w", err)
 	}
 
 	return result, nil
-
 }
 
 // generateShortURL is a sub-function for SaveURL

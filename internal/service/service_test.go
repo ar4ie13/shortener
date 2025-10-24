@@ -260,7 +260,7 @@ func TestService_GetURL_Mockery(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockRepo := mockery.NewMockRepository(t)
-			service := Service{r: mockRepo}
+			service := Service{repo: mockRepo}
 
 			if tt.shouldCallRepo {
 				mockRepo.On("GetURL", context.Background(), tt.shortURL).Return(tt.mockReturnURL, tt.mockReturnErr)
