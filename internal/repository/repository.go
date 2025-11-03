@@ -32,10 +32,12 @@ func NewRepository(
 		if err != nil {
 			return nil, err
 		}
+		zlog.Info().Msg("using PostgreSQL repository")
 		err = postgresql.ApplyMigrations(pgcfg, zlog)
 		if err != nil {
 			return nil, err
 		}
+		zlog.Info().Msg("applying migrations")
 		return db, nil
 	case fileconf.FilePath != "":
 		filestore := filestorage.NewFileStorage(fileconf, zlog)
@@ -43,8 +45,10 @@ func NewRepository(
 		if err != nil {
 			return nil, err
 		}
+		zlog.Info().Msg("using FileStorage repository")
 		return filestore, nil
 	default:
+		zlog.Warn().Msg("using Memory repository")
 		return memory.NewMemStorage(), nil
 	}
 }
