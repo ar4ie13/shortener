@@ -112,6 +112,7 @@ func (h Handler) postURL(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
+	fmt.Println(userUUID)
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil || len(body) == 0 {
