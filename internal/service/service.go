@@ -35,8 +35,8 @@ const (
 
 // Repository interface used to interact with repository package to store or retrieve values
 type Repository interface {
-	GetURL(ctx context.Context, userUUID uuid.UUID, shortURL string) (string, error)
-	GetShortURL(ctx context.Context, userUUID uuid.UUID, originalURL string) (string, error)
+	GetURL(ctx context.Context, shortURL string) (string, error)
+	GetShortURL(ctx context.Context, originalURL string) (string, error)
 	Save(ctx context.Context, userUUID uuid.UUID, shortURL string, url string) error
 	SaveBatch(ctx context.Context, userUUID uuid.UUID, batch []model.URL) error
 	GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[string]string, error)
@@ -58,7 +58,7 @@ func (s Service) GetURL(ctx context.Context, userUUID uuid.UUID, shortURL string
 		return "", errEmptyID
 	}
 
-	getURL, err := s.repo.GetURL(ctx, userUUID, shortURL)
+	getURL, err := s.repo.GetURL(ctx, shortURL)
 	if getURL == "" || err != nil {
 		return "", fmt.Errorf("failed to get URL: %w", err)
 	}
@@ -119,7 +119,7 @@ func (s Service) SaveURL(ctx context.Context, userUUID uuid.UUID, urlLink string
 		}
 
 		if errors.Is(err, ErrURLExist) {
-			slug, err = s.repo.GetShortURL(ctx, userUUID, urlLink)
+			slug, err = s.repo.GetShortURL(ctx, urlLink)
 			if err != nil {
 				return "", ErrNotFound
 			}

@@ -46,8 +46,8 @@ func (fs *FileStorage) Load() error {
 }
 
 // GetURL method is used to get URL (link) from the map
-func (fs *FileStorage) GetURL(ctx context.Context, userUUID uuid.UUID, shortURL string) (string, error) {
-	urlLink, err := fs.m.GetURL(ctx, userUUID, shortURL)
+func (fs *FileStorage) GetURL(ctx context.Context, shortURL string) (string, error) {
+	urlLink, err := fs.m.GetURL(ctx, shortURL)
 	if err != nil {
 		return "", err
 	}
@@ -56,8 +56,8 @@ func (fs *FileStorage) GetURL(ctx context.Context, userUUID uuid.UUID, shortURL 
 }
 
 // GetShortURL method is used to get URL (link) from the map
-func (fs *FileStorage) GetShortURL(ctx context.Context, userUUID uuid.UUID, originalURL string) (string, error) {
-	slug, err := fs.m.GetShortURL(ctx, userUUID, originalURL)
+func (fs *FileStorage) GetShortURL(ctx context.Context, originalURL string) (string, error) {
+	slug, err := fs.m.GetShortURL(ctx, originalURL)
 	if err != nil {
 		return "", err
 	}
@@ -78,7 +78,7 @@ func (fs *FileStorage) Save(ctx context.Context, userUUID uuid.UUID, shortURL st
 	return nil
 }
 
-// Store is method to store UUID, short_url and original_url in jsonl format
+// Store is method to store UUID, short_url and original_url in jsonl format to file storage
 func (fs *FileStorage) Store(shortURL string, userUUID uuid.UUID, url string) error {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
@@ -150,6 +150,7 @@ func (fs *FileStorage) LoadFile() error {
 		}
 
 		fs.m.SlugMemStore[fs.urlMapping.ShortURL] = fs.urlMapping.OriginalURL
+		fs.m.URLMemStore[fs.urlMapping.OriginalURL] = fs.urlMapping.ShortURL
 		fs.m.UserUUIDURLMemStore[fs.urlMapping.UserUUID][fs.urlMapping.OriginalURL] = fs.urlMapping.ShortURL
 		fs.m.UserUUIDSlugMemStore[fs.urlMapping.UserUUID][fs.urlMapping.ShortURL] = fs.urlMapping.OriginalURL
 		fs.m.UUIDMemStore[fs.urlMapping.UUID] = fs.urlMapping.ShortURL

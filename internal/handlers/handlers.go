@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 
@@ -99,6 +98,8 @@ func (h Handler) getStatusCode(err error) (statusCode int) {
 		return http.StatusBadRequest
 	case errors.Is(err, service.ErrURLExist):
 		return http.StatusConflict
+	case errors.Is(err, service.ErrNotFound):
+		return http.StatusNoContent
 	default:
 		return http.StatusInternalServerError
 	}
@@ -110,7 +111,6 @@ func (h Handler) postURL(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
-	fmt.Println(userUUID)
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil || len(body) == 0 {
@@ -222,7 +222,6 @@ func (h Handler) getURL(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
-	fmt.Println(userUUID)
 
 	id := chi.URLParam(r, "id")
 	url, err := h.service.GetURL(r.Context(), userUUID, id)
@@ -321,6 +320,10 @@ func (h Handler) getUsersShortURL(w http.ResponseWriter, r *http.Request) {
 		case http.StatusBadRequest:
 			http.Error(w, err.Error(), statusCode)
 			return
+
+		case http.StatusNoContent:
+			http.Error(w, err.Error(), statusCode)
+			return
 		}
 
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -335,7 +338,7 @@ func (h Handler) getUsersShortURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusOK)
 	enc := json.NewEncoder(w)
 	if err = enc.Encode(resp); err != nil {
 		h.zlog.Debug().Msgf("error encoding response: %v", err)

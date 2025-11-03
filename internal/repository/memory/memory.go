@@ -27,6 +27,7 @@ type UserUUIDSlugMemStore map[uuid.UUID]SlugMemStore
 // MemStorage is the main object for the package repository
 type MemStorage struct {
 	SlugMemStore
+	URLMemStore
 	UserUUIDURLMemStore
 	UUIDMemStore
 	UserUUIDSlugMemStore
@@ -36,6 +37,7 @@ type MemStorage struct {
 func NewMemStorage() *MemStorage {
 	return &MemStorage{
 		SlugMemStore:         make(map[string]string),
+		URLMemStore:          make(map[string]string),
 		UserUUIDURLMemStore:  make(map[uuid.UUID]URLMemStore),
 		UUIDMemStore:         make(map[uuid.UUID]string),
 		UserUUIDSlugMemStore: make(map[uuid.UUID]SlugMemStore),
@@ -43,8 +45,8 @@ func NewMemStorage() *MemStorage {
 }
 
 // GetURL method is used to get URL (link) from the repository map
-func (repo *MemStorage) GetURL(_ context.Context, userUUID uuid.UUID, shortURL string) (string, error) {
-	if v, ok := repo.UserUUIDSlugMemStore[userUUID][shortURL]; ok {
+func (repo *MemStorage) GetURL(_ context.Context, shortURL string) (string, error) {
+	if v, ok := repo.SlugMemStore[shortURL]; ok {
 		return v, nil
 	}
 
@@ -52,8 +54,8 @@ func (repo *MemStorage) GetURL(_ context.Context, userUUID uuid.UUID, shortURL s
 }
 
 // GetShortURL method is used to get shortURL from the repository map
-func (repo *MemStorage) GetShortURL(_ context.Context, userUUID uuid.UUID, originalURL string) (string, error) {
-	if v, ok := repo.UserUUIDURLMemStore[userUUID][originalURL]; ok {
+func (repo *MemStorage) GetShortURL(_ context.Context, originalURL string) (string, error) {
+	if v, ok := repo.URLMemStore[originalURL]; ok {
 		return v, nil
 	}
 
@@ -61,8 +63,8 @@ func (repo *MemStorage) GetShortURL(_ context.Context, userUUID uuid.UUID, origi
 }
 
 // existsURL check if URL exist in the map
-func (repo *MemStorage) existsURL(userUUID uuid.UUID, url string) bool {
-	if _, ok := repo.UserUUIDURLMemStore[userUUID][url]; ok {
+func (repo *MemStorage) existsURL(url string) bool {
+	if _, ok := repo.URLMemStore[url]; ok {
 		return true
 	}
 
@@ -85,7 +87,7 @@ func (repo *MemStorage) Save(_ context.Context, userUUID uuid.UUID, shortURL str
 		return service.ErrEmptyShortURLorURL
 	}
 
-	if repo.existsURL(userUUID, url) {
+	if repo.existsURL(url) {
 		return fmt.Errorf("%w :%s", service.ErrURLExist, url)
 	}
 
@@ -94,6 +96,7 @@ func (repo *MemStorage) Save(_ context.Context, userUUID uuid.UUID, shortURL str
 	}
 
 	repo.SlugMemStore[shortURL] = url
+	repo.URLMemStore[url] = shortURL
 	if repo.UserUUIDURLMemStore[userUUID] == nil {
 		repo.UserUUIDURLMemStore[userUUID] = make(URLMemStore)
 	}
@@ -115,7 +118,7 @@ func (repo *MemStorage) SaveBatch(_ context.Context, userUUID uuid.UUID, batch [
 		switch {
 		case batch[i].ShortURL == "" || batch[i].OriginalURL == "":
 			return service.ErrEmptyShortURLorURL
-		case repo.existsURL(userUUID, batch[i].OriginalURL):
+		case repo.existsURL(batch[i].OriginalURL):
 			return fmt.Errorf("%w: %s", service.ErrURLExist, batch[i].OriginalURL)
 		case repo.existsShortURL(batch[i].ShortURL):
 			return fmt.Errorf("%w: %s", service.ErrShortURLExist, batch[i].ShortURL)
@@ -129,6 +132,7 @@ func (repo *MemStorage) SaveBatch(_ context.Context, userUUID uuid.UUID, batch [
 		repo.UserUUIDSlugMemStore[userUUID] = make(SlugMemStore)
 	}
 	for i := range result {
+		repo.URLMemStore[result[i].OriginalURL] = result[i].ShortURL
 		repo.SlugMemStore[result[i].ShortURL] = batch[i].OriginalURL
 		repo.UserUUIDSlugMemStore[userUUID][result[i].ShortURL] = batch[i].OriginalURL
 		repo.UserUUIDURLMemStore[userUUID][batch[i].OriginalURL] = batch[i].ShortURL

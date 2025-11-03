@@ -60,9 +60,9 @@ func (db *DB) Close() error {
 }
 
 // GetShortURL gets short_url from db by provided URL
-func (db *DB) GetShortURL(ctx context.Context, userUUID uuid.UUID, originalURL string) (shortURL string, err error) {
+func (db *DB) GetShortURL(ctx context.Context, originalURL string) (shortURL string, err error) {
 
-	const queryStmt = `SELECT short_url FROM urls WHERE original_url = $1 AND user_uuid = $2`
+	const queryStmt = `SELECT short_url FROM urls WHERE original_url = $1`
 
 	start := time.Now()
 	defer func() {
@@ -70,7 +70,7 @@ func (db *DB) GetShortURL(ctx context.Context, userUUID uuid.UUID, originalURL s
 		db.zlog.Debug().Msgf("request execution duration: %s", elapsed)
 	}()
 
-	row := db.pool.QueryRow(ctx, queryStmt, originalURL, userUUID)
+	row := db.pool.QueryRow(ctx, queryStmt, originalURL)
 
 	err = row.Scan(&shortURL)
 	if err != nil {
@@ -86,9 +86,9 @@ func (db *DB) GetShortURL(ctx context.Context, userUUID uuid.UUID, originalURL s
 }
 
 // GetURL gets URL by provided shortURL
-func (db *DB) GetURL(ctx context.Context, userUUID uuid.UUID, shortURL string) (originalURL string, err error) {
+func (db *DB) GetURL(ctx context.Context, shortURL string) (originalURL string, err error) {
 
-	const queryStmt = `SELECT original_url FROM urls WHERE short_url = $1 AND user_uuid = $2`
+	const queryStmt = `SELECT original_url FROM urls WHERE short_url = $1`
 
 	start := time.Now()
 	defer func() {
@@ -96,7 +96,7 @@ func (db *DB) GetURL(ctx context.Context, userUUID uuid.UUID, shortURL string) (
 		db.zlog.Debug().Msgf("request execution duration: %s", elapsed)
 	}()
 
-	row := db.pool.QueryRow(ctx, queryStmt, shortURL, userUUID)
+	row := db.pool.QueryRow(ctx, queryStmt, shortURL)
 
 	err = row.Scan(&originalURL)
 	if err != nil {
@@ -133,7 +133,7 @@ func (db *DB) Save(ctx context.Context, userUUID uuid.UUID, shortURL string, ori
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
 			switch {
-			case strings.Contains(err.Error(), "urls_user_id_original_url_uq"):
+			case strings.Contains(err.Error(), "urls_original_url_key"):
 				return fmt.Errorf("error while saving URL %s: %w", originalURL, service.ErrURLExist)
 			case strings.Contains(err.Error(), "urls_short_url_key"):
 				return fmt.Errorf("error while saving URL %s: %w", shortURL, service.ErrShortURLExist)
@@ -171,9 +171,7 @@ func (db *DB) SaveBatch(ctx context.Context, userUUID uuid.UUID, batch []model.U
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
 				return fmt.Errorf("error while saving URL %s: %w", v.OriginalURL, err)
-
 			}
-
 			return fmt.Errorf("unable to insert row: %w", err)
 		}
 	}
@@ -194,6 +192,11 @@ func (db *DB) GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[str
 	if err != nil {
 		return nil, err
 	}
+
+	if !rows.Next() {
+		return nil, service.ErrNotFound
+	}
+
 	userShortURLs := make(map[string]string)
 	for rows.Next() {
 		var shortURL string
@@ -203,6 +206,11 @@ func (db *DB) GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[str
 			return nil, err
 		}
 		userShortURLs[shortURL] = originalURL
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return nil, err
 	}
 
 	return userShortURLs, nil
