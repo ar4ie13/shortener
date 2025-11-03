@@ -7,6 +7,12 @@ import (
 	"github.com/google/uuid"
 )
 
+// contextKey is a personal type for context UUID keys
+type contextUUIDKey string
+
+// userUUIDKey is a unique key for user_id in context
+const userUUIDKey contextUUIDKey = "user_id"
+
 func (h Handler) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("user_id")
@@ -40,8 +46,8 @@ func (h Handler) authMiddleware(next http.Handler) http.Handler {
 				return
 			}
 		}
-
-		ctx := context.WithValue(r.Context(), "user_id", userUUID.String())
+		ctxUserUUID := userUUID.String()
+		ctx := context.WithValue(r.Context(), userUUIDKey, ctxUserUUID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

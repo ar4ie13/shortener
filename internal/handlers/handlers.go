@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -81,7 +82,7 @@ func (h Handler) ListenAndServe() error {
 
 // getUserUID
 func (h Handler) getUserUUIDFromRequest(r *http.Request) (uuid.UUID, error) {
-	userUUID, err := uuid.Parse(r.Context().Value("user_id").(string))
+	userUUID, err := uuid.Parse(r.Context().Value(userUUIDKey).(string))
 	if err != nil {
 		h.zlog.Debug().Msgf("cannot parse user UUID: %v", err)
 		return uuid.Nil, err
@@ -109,6 +110,7 @@ func (h Handler) postURL(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
+	fmt.Println(userUUID)
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil || len(body) == 0 {
@@ -220,6 +222,7 @@ func (h Handler) getURL(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
+	fmt.Println(userUUID)
 
 	id := chi.URLParam(r, "id")
 	url, err := h.service.GetURL(r.Context(), userUUID, id)
