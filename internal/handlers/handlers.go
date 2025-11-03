@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -312,6 +313,7 @@ func (h Handler) getUsersShortURL(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
+	fmt.Println(userUUID)
 
 	userSlugs, err := h.service.GetUserShortURLs(r.Context(), userUUID)
 	if err != nil {
