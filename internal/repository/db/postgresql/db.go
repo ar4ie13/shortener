@@ -193,14 +193,15 @@ func (db *DB) GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[str
 		return nil, err
 	}
 
-	if !rows.Next() {
-		return nil, service.ErrNotFound
-	}
+	//if !rows.Next() {
+	//	return nil, service.ErrNotFound
+	//}
 
 	userShortURLs := make(map[string]string)
 	for rows.Next() {
 		var shortURL string
 		var originalURL string
+
 		err = rows.Scan(&shortURL, &originalURL)
 		if err != nil {
 			return nil, err
@@ -211,6 +212,10 @@ func (db *DB) GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[str
 	err = rows.Err()
 	if err != nil {
 		return nil, err
+	}
+
+	if len(userShortURLs) == 0 {
+		return nil, service.ErrNotFound
 	}
 
 	return userShortURLs, nil

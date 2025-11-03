@@ -54,33 +54,6 @@ func (a Auth) BuildJWTString(userUUID uuid.UUID) (string, error) {
 	return tokenString, nil
 }
 
-//// ValidateUserUUID validates token and return the UUID of user
-//func (a Auth) ValidateUserUUID(tokenString string) (uuid.UUID, error) {
-//	claims, token, err := a.parseTokenString(tokenString)
-//	if err != nil {
-//		if errors.Is(err, jwt.ErrTokenExpired) {
-//			tokenString, err = a.BuildJWTString(claims.UserUUID)
-//			if err != nil {
-//				return uuid.Nil, err
-//			}
-//			claims, token, err = a.parseTokenString(tokenString)
-//			if err != nil {
-//				return uuid.Nil, err
-//			}
-//		} else {
-//			return uuid.Nil, err
-//		}
-//	}
-//	if claims.UserUUID.String() == "" {
-//		return uuid.Nil, service.ErrInvalidUserUUID
-//	}
-//
-//	if !token.Valid {
-//		return uuid.Nil, fmt.Errorf("invalid token")
-//	}
-//	return claims.UserUUID, nil
-//}
-
 // ValidateUserUUID validates token and return the UUID of user
 func (a Auth) ValidateUserUUID(tokenString string) (uuid.UUID, error) {
 	claims, token, err := a.parseTokenString(tokenString)

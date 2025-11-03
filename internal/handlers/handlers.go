@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 
@@ -112,7 +111,6 @@ func (h Handler) postURL(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
-	fmt.Println("post, ", userUUID)
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil || len(body) == 0 {
@@ -314,7 +312,6 @@ func (h Handler) getUsersShortURL(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
-	fmt.Println("get users, ", userUUID)
 
 	userSlugs, err := h.service.GetUserShortURLs(r.Context(), userUUID)
 	if err != nil {
@@ -348,5 +345,4 @@ func (h Handler) getUsersShortURL(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	fmt.Println("users, ", resp)
 }
