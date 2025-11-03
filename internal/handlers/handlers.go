@@ -11,14 +11,23 @@ import (
 	"github.com/ar4ie13/shortener/internal/model"
 	"github.com/ar4ie13/shortener/internal/service"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 )
 
 // Service interface interacts with service package
 type Service interface {
-	GetURL(ctx context.Context, id string) (string, error)
-	SaveURL(ctx context.Context, url string) (slug string, err error)
-	SaveBatch(ctx context.Context, batch []model.URL) ([]model.URL, error)
+	GetURL(ctx context.Context, userUUID uuid.UUID, id string) (string, error)
+	SaveURL(ctx context.Context, userUUID uuid.UUID, url string) (slug string, err error)
+	SaveBatch(ctx context.Context, userUUID uuid.UUID, batch []model.URL) ([]model.URL, error)
+	GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[string]string, error)
+}
+
+// Auth used for authentication
+type Auth interface {
+	GenerateUserUUID() uuid.UUID
+	BuildJWTString(userUUID uuid.UUID) (string, error)
+	ValidateUserUUID(tokenString string) (uuid.UUID, error)
 }
 
 // Config interface gets configuration flags from config package
@@ -33,12 +42,13 @@ type Config interface {
 type Handler struct {
 	service Service
 	cfg     Config
+	auth    Auth
 	zlog    zerolog.Logger
 }
 
 // NewHandler constructs Handler object
-func NewHandler(s Service, c Config, zlog zerolog.Logger) *Handler {
-	return &Handler{s, c, zlog}
+func NewHandler(s Service, c Config, a Auth, zlog zerolog.Logger) *Handler {
+	return &Handler{s, c, a, zlog}
 }
 
 // ListenAndServe starts web server with specified chi router
@@ -47,15 +57,17 @@ func (h Handler) ListenAndServe() error {
 
 	// middleware for router
 	router.Use(h.requestLogger)
-	router.Use(gzipMiddleware)
+	router.Use(h.authMiddleware)
+	router.Use(h.gzipMiddleware)
 
 	router.Route("/", func(router chi.Router) {
 		router.Post("/", h.postURL)
-		router.Get("/{id}", h.getShortURLByID)
+		router.Get("/{id}", h.getURL)
 		router.Get("/ping", h.checkPostgresConnection)
 		router.Route("/api", func(router chi.Router) {
 			router.Post("/shorten", h.postURLJSON)
 			router.Post("/shorten/batch", h.postURLJSONBatch)
+			router.Get("/user/urls", h.getUsersShortURL)
 		})
 	})
 	h.zlog.Info().Msgf("listening on %v\nURL Template: %v\nLog Level: %v", h.cfg.GetLocalServerAddr(), h.cfg.GetShortURLTemplate(), h.cfg.GetLogLevel())
@@ -67,8 +79,19 @@ func (h Handler) ListenAndServe() error {
 	return nil
 }
 
-// errorProcessing process error and return the correlated status code
-func (h Handler) errorProcessing(err error) (statusCode int) {
+// getUserUID
+func (h Handler) getUserUUIDFromRequest(r *http.Request) (uuid.UUID, error) {
+	userUUID, err := uuid.Parse(r.Context().Value("user_id").(string))
+	if err != nil {
+		h.zlog.Debug().Msgf("cannot parse user UUID: %v", err)
+		return uuid.Nil, err
+	}
+
+	return userUUID, nil
+}
+
+// getStatusCode process error and return the correlated status code
+func (h Handler) getStatusCode(err error) (statusCode int) {
 	switch {
 	case errors.Is(err, service.ErrEmptyURL) || errors.Is(err, service.ErrInvalidURLFormat) ||
 		errors.Is(err, service.ErrWrongHTTPScheme) || errors.Is(err, service.ErrMustIncludeHost):
@@ -82,15 +105,20 @@ func (h Handler) errorProcessing(err error) (statusCode int) {
 
 // postURL handles POST requests from clients and receives URL from body to store it in the Repository via Service
 func (h Handler) postURL(w http.ResponseWriter, r *http.Request) {
+	userUUID, err := h.getUserUUIDFromRequest(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
 	body, err := io.ReadAll(r.Body)
 	if err != nil || len(body) == 0 {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	slug, err := h.service.SaveURL(r.Context(), string(body))
+	slug, err := h.service.SaveURL(r.Context(), userUUID, string(body))
 	if err != nil {
-		statusCode := h.errorProcessing(err)
+		statusCode := h.getStatusCode(err)
 		switch statusCode {
 		case http.StatusConflict:
 			w.WriteHeader(statusCode)
@@ -118,6 +146,11 @@ func (h Handler) postURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
+	userUUID, err := h.getUserUUIDFromRequest(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
 	if r.Header.Get("Content-Type") != "application/json" {
 		w.WriteHeader(http.StatusBadRequest)
 	}
@@ -139,9 +172,9 @@ func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
 	}
 	h.zlog.Debug().Msg("request decoded successfully")
 
-	slug, err := h.service.SaveURL(r.Context(), req.LongURL)
+	slug, err := h.service.SaveURL(r.Context(), userUUID, req.LongURL)
 	if err != nil {
-		statusCode := h.errorProcessing(err)
+		statusCode := h.getStatusCode(err)
 		switch statusCode {
 		case http.StatusConflict:
 			resp := ShortURLResp{
@@ -181,10 +214,15 @@ func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// getShortURLByID handles get requests and redirects to the URL by provided shortURL if it is found in Repository
-func (h Handler) getShortURLByID(w http.ResponseWriter, r *http.Request) {
+// getURL handles get requests and redirects to the URL by provided shortURL if it is found in Repository
+func (h Handler) getURL(w http.ResponseWriter, r *http.Request) {
+	userUUID, err := h.getUserUUIDFromRequest(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
 	id := chi.URLParam(r, "id")
-	url, err := h.service.GetURL(r.Context(), id)
+	url, err := h.service.GetURL(r.Context(), userUUID, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -205,6 +243,11 @@ func (h Handler) checkPostgresConnection(w http.ResponseWriter, r *http.Request)
 
 // postURLJSONBatch handles bath request in JSON
 func (h Handler) postURLJSONBatch(w http.ResponseWriter, r *http.Request) {
+	userUUID, err := h.getUserUUIDFromRequest(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
 	if r.Header.Get("Content-Type") != "application/json" {
 		w.WriteHeader(http.StatusBadRequest)
 	}
@@ -234,9 +277,9 @@ func (h Handler) postURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 		URLs = append(URLs, model.URL{UUID: req[i].UUID, OriginalURL: req[i].LongURL})
 	}
 
-	serviceResp, err := h.service.SaveBatch(r.Context(), URLs)
+	serviceResp, err := h.service.SaveBatch(r.Context(), userUUID, URLs)
 	if err != nil {
-		statusCode := h.errorProcessing(err)
+		statusCode := h.getStatusCode(err)
 		switch statusCode {
 		case http.StatusBadRequest:
 			http.Error(w, err.Error(), statusCode)
@@ -256,6 +299,43 @@ func (h Handler) postURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 	enc := json.NewEncoder(w)
 	if err = enc.Encode(resp); err != nil {
 		h.zlog.Debug().Msgf("error encoding batch response: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+// getURL handles get requests and redirects to the URL by provided shortURL if it is found in Repository
+func (h Handler) getUsersShortURL(w http.ResponseWriter, r *http.Request) {
+	userUUID, err := h.getUserUUIDFromRequest(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	userSlugs, err := h.service.GetUserShortURLs(r.Context(), userUUID)
+	if err != nil {
+		statusCode := h.getStatusCode(err)
+		switch statusCode {
+		case http.StatusBadRequest:
+			http.Error(w, err.Error(), statusCode)
+			return
+		}
+
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.zlog.Error().Msgf("error handling request: %v", err)
+		return
+	}
+
+	var resp []UserShortURLs
+
+	for k, v := range userSlugs {
+		resp = append(resp, UserShortURLs{ShortURL: h.cfg.GetShortURLTemplate() + "/" + k, LongURL: v})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	enc := json.NewEncoder(w)
+	if err = enc.Encode(resp); err != nil {
+		h.zlog.Debug().Msgf("error encoding response: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

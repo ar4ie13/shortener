@@ -9,13 +9,15 @@ import (
 	"strings"
 
 	"github.com/ar4ie13/shortener/internal/model"
+	"github.com/google/uuid"
 )
 
 var (
 	ErrNotFound           = errors.New("not found")
 	ErrURLExist           = errors.New("URL already exist")
-	ErrEmptyShortURLorURL = errors.New("ID or URL cannot be empty")
-	ErrShortURLExist      = errors.New("ShortURL already exist")
+	ErrEmptyShortURLorURL = errors.New("shortURL or URL cannot be empty")
+	ErrShortURLExist      = errors.New("shortURL already exist")
+	ErrInvalidUserUUID    = errors.New("invalid user UUID")
 
 	ErrEmptyURL         = errors.New("URL template cannot be empty")
 	ErrWrongHTTPScheme  = errors.New("URL template must use http or https scheme")
@@ -33,10 +35,11 @@ const (
 
 // Repository interface used to interact with repository package to store or retrieve values
 type Repository interface {
-	GetURL(ctx context.Context, shortURL string) (string, error)
-	GetShortURL(ctx context.Context, originalURL string) (string, error)
-	Save(ctx context.Context, shortURL string, url string) error
-	SaveBatch(ctx context.Context, batch []model.URL) error
+	GetURL(ctx context.Context, userUUID uuid.UUID, shortURL string) (string, error)
+	GetShortURL(ctx context.Context, userUUID uuid.UUID, originalURL string) (string, error)
+	Save(ctx context.Context, userUUID uuid.UUID, shortURL string, url string) error
+	SaveBatch(ctx context.Context, userUUID uuid.UUID, batch []model.URL) error
+	GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[string]string, error)
 }
 
 // Service is a main object of the package that implements Repository interface
@@ -50,12 +53,12 @@ func NewService(r Repository) *Service {
 }
 
 // GetURL method gets URL by provided id
-func (s Service) GetURL(ctx context.Context, shortURL string) (string, error) {
+func (s Service) GetURL(ctx context.Context, userUUID uuid.UUID, shortURL string) (string, error) {
 	if shortURL == "" {
 		return "", errEmptyID
 	}
 
-	getURL, err := s.repo.GetURL(ctx, shortURL)
+	getURL, err := s.repo.GetURL(ctx, userUUID, shortURL)
 	if getURL == "" || err != nil {
 		return "", fmt.Errorf("failed to get URL: %w", err)
 	}
@@ -63,8 +66,19 @@ func (s Service) GetURL(ctx context.Context, shortURL string) (string, error) {
 	return getURL, nil
 }
 
+// GetUserShortURLs method gets all shortURLs and URL saved by user
+func (s Service) GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[string]string, error) {
+
+	result, err := s.repo.GetUserShortURLs(ctx, userUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get short urls: %w", err)
+	}
+
+	return result, nil
+}
+
 // SaveURL generates shortURL for non-existent URL and stores it in the Repository
-func (s Service) SaveURL(ctx context.Context, urlLink string) (slug string, err error) {
+func (s Service) SaveURL(ctx context.Context, userUUID uuid.UUID, urlLink string) (slug string, err error) {
 
 	urlLink = strings.TrimRight(urlLink, "/")
 
@@ -98,14 +112,14 @@ func (s Service) SaveURL(ctx context.Context, urlLink string) (slug string, err 
 			continue
 		}
 
-		err = s.repo.Save(ctx, slug, urlLink)
+		err = s.repo.Save(ctx, userUUID, slug, urlLink)
 
 		if err == nil {
 			return slug, nil
 		}
 
 		if errors.Is(err, ErrURLExist) {
-			slug, err = s.repo.GetShortURL(ctx, urlLink)
+			slug, err = s.repo.GetShortURL(ctx, userUUID, urlLink)
 			if err != nil {
 				return "", ErrNotFound
 			}
@@ -122,7 +136,7 @@ func (s Service) SaveURL(ctx context.Context, urlLink string) (slug string, err 
 }
 
 // SaveBatch saves batch of jsonl rows to the repository
-func (s Service) SaveBatch(ctx context.Context, batch []model.URL) ([]model.URL, error) {
+func (s Service) SaveBatch(ctx context.Context, userUUID uuid.UUID, batch []model.URL) ([]model.URL, error) {
 	result := make([]model.URL, len(batch))
 	for i := range batch {
 		slug, err := generateShortURL(shortURLLen)
@@ -158,7 +172,7 @@ func (s Service) SaveBatch(ctx context.Context, batch []model.URL) ([]model.URL,
 		}
 	}
 
-	err := s.repo.SaveBatch(ctx, result)
+	err := s.repo.SaveBatch(ctx, userUUID, result)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save batch: %w", err)
 	}

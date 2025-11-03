@@ -46,8 +46,8 @@ func (fs *FileStorage) Load() error {
 }
 
 // GetURL method is used to get URL (link) from the map
-func (fs *FileStorage) GetURL(ctx context.Context, shortURL string) (string, error) {
-	urlLink, err := fs.m.GetURL(ctx, shortURL)
+func (fs *FileStorage) GetURL(ctx context.Context, userUUID uuid.UUID, shortURL string) (string, error) {
+	urlLink, err := fs.m.GetURL(ctx, userUUID, shortURL)
 	if err != nil {
 		return "", err
 	}
@@ -56,8 +56,8 @@ func (fs *FileStorage) GetURL(ctx context.Context, shortURL string) (string, err
 }
 
 // GetShortURL method is used to get URL (link) from the map
-func (fs *FileStorage) GetShortURL(ctx context.Context, originalURL string) (string, error) {
-	slug, err := fs.m.GetShortURL(ctx, originalURL)
+func (fs *FileStorage) GetShortURL(ctx context.Context, userUUID uuid.UUID, originalURL string) (string, error) {
+	slug, err := fs.m.GetShortURL(ctx, userUUID, originalURL)
 	if err != nil {
 		return "", err
 	}
@@ -66,12 +66,12 @@ func (fs *FileStorage) GetShortURL(ctx context.Context, originalURL string) (str
 }
 
 // Save is a method used to save short url and original url
-func (fs *FileStorage) Save(ctx context.Context, shortURL string, url string) error {
-	if err := fs.m.Save(ctx, shortURL, url); err != nil {
+func (fs *FileStorage) Save(ctx context.Context, userUUID uuid.UUID, shortURL string, url string) error {
+	if err := fs.m.Save(ctx, userUUID, shortURL, url); err != nil {
 		return err
 	}
 
-	if err := fs.Store(shortURL, url); err != nil {
+	if err := fs.Store(shortURL, userUUID, url); err != nil {
 		return err
 	}
 
@@ -79,11 +79,12 @@ func (fs *FileStorage) Save(ctx context.Context, shortURL string, url string) er
 }
 
 // Store is method to store UUID, short_url and original_url in jsonl format
-func (fs *FileStorage) Store(shortURL string, url string) error {
+func (fs *FileStorage) Store(shortURL string, userUUID uuid.UUID, url string) error {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
 	fs.urlMapping.UUID = uuid.New()
+	fs.urlMapping.UserUUID = userUUID
 	fs.urlMapping.ShortURL = shortURL
 	fs.urlMapping.OriginalURL = url
 
@@ -141,24 +142,30 @@ func (fs *FileStorage) LoadFile() error {
 			fs.zlog.Debug().Msgf("error decoding JSON: %v\n", err)
 			continue
 		}
+		if fs.m.UserUUIDURLMemStore[fs.urlMapping.UserUUID] == nil {
+			fs.m.UserUUIDURLMemStore[fs.urlMapping.UserUUID] = make(map[string]string)
+		}
+		if fs.m.UserUUIDSlugMemStore[fs.urlMapping.UserUUID] == nil {
+			fs.m.UserUUIDSlugMemStore[fs.urlMapping.UserUUID] = make(map[string]string)
+		}
 
 		fs.m.SlugMemStore[fs.urlMapping.ShortURL] = fs.urlMapping.OriginalURL
-		fs.m.URLMemStore[fs.urlMapping.OriginalURL] = fs.urlMapping.ShortURL
+		fs.m.UserUUIDURLMemStore[fs.urlMapping.UserUUID][fs.urlMapping.OriginalURL] = fs.urlMapping.ShortURL
+		fs.m.UserUUIDSlugMemStore[fs.urlMapping.UserUUID][fs.urlMapping.ShortURL] = fs.urlMapping.OriginalURL
 		fs.m.UUIDMemStore[fs.urlMapping.UUID] = fs.urlMapping.ShortURL
 		fs.zlog.Debug().Msgf("read: UUID=%s, ShortURL=%s, URL=%s", fs.urlMapping.UUID, fs.urlMapping.ShortURL, fs.urlMapping.OriginalURL)
 
 	}
 
 	fs.zlog.Debug().Msgf("filestorage red successfully, map contains %d items", len(fs.m.SlugMemStore))
-
 	return nil
 }
 
 // SaveBatch used to save batch of short urls and URL to the file storage
-func (fs *FileStorage) SaveBatch(ctx context.Context, batch []model.URL) error {
+func (fs *FileStorage) SaveBatch(ctx context.Context, userUUID uuid.UUID, batch []model.URL) error {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
-	err := fs.m.SaveBatch(ctx, batch)
+	err := fs.m.SaveBatch(ctx, userUUID, batch)
 	if err != nil {
 		return err
 	}
@@ -171,6 +178,7 @@ func (fs *FileStorage) SaveBatch(ctx context.Context, batch []model.URL) error {
 
 	for i := range batch {
 		fs.urlMapping.UUID = batch[i].UUID
+		fs.urlMapping.UserUUID = userUUID
 		fs.urlMapping.ShortURL = batch[i].ShortURL
 		fs.urlMapping.OriginalURL = batch[i].OriginalURL
 
@@ -189,4 +197,12 @@ func (fs *FileStorage) SaveBatch(ctx context.Context, batch []model.URL) error {
 	}
 
 	return nil
+}
+
+func (fs *FileStorage) GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[string]string, error) {
+	result, err := fs.m.GetUserShortURLs(ctx, userUUID)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/ar4ie13/shortener/internal/model"
 	"github.com/ar4ie13/shortener/internal/repository/db/postgresql/config"
 	"github.com/ar4ie13/shortener/internal/service"
+	"github.com/google/uuid"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -52,16 +53,16 @@ func initPool(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
-// Close closed pgx pool
+// Close closes pgx pool
 func (db *DB) Close() error {
 	db.pool.Close()
 	return nil
 }
 
 // GetShortURL gets short_url from db by provided URL
-func (db *DB) GetShortURL(ctx context.Context, originalURL string) (shortURL string, err error) {
+func (db *DB) GetShortURL(ctx context.Context, userUUID uuid.UUID, originalURL string) (shortURL string, err error) {
 
-	const queryStmt = `SELECT short_url FROM urls WHERE original_url = $1`
+	const queryStmt = `SELECT short_url FROM urls WHERE original_url = $1 AND user_uuid = $2`
 
 	start := time.Now()
 	defer func() {
@@ -69,7 +70,7 @@ func (db *DB) GetShortURL(ctx context.Context, originalURL string) (shortURL str
 		db.zlog.Debug().Msgf("request execution duration: %s", elapsed)
 	}()
 
-	row := db.pool.QueryRow(ctx, queryStmt, originalURL)
+	row := db.pool.QueryRow(ctx, queryStmt, originalURL, userUUID)
 
 	err = row.Scan(&shortURL)
 	if err != nil {
@@ -85,9 +86,9 @@ func (db *DB) GetShortURL(ctx context.Context, originalURL string) (shortURL str
 }
 
 // GetURL gets URL by provided shortURL
-func (db *DB) GetURL(ctx context.Context, shortURL string) (originalURL string, err error) {
+func (db *DB) GetURL(ctx context.Context, userUUID uuid.UUID, shortURL string) (originalURL string, err error) {
 
-	const queryStmt = `SELECT original_url FROM urls WHERE short_url = $1`
+	const queryStmt = `SELECT original_url FROM urls WHERE short_url = $1 AND user_uuid = $2`
 
 	start := time.Now()
 	defer func() {
@@ -95,7 +96,7 @@ func (db *DB) GetURL(ctx context.Context, shortURL string) (originalURL string, 
 		db.zlog.Debug().Msgf("request execution duration: %s", elapsed)
 	}()
 
-	row := db.pool.QueryRow(ctx, queryStmt, shortURL)
+	row := db.pool.QueryRow(ctx, queryStmt, shortURL, userUUID)
 
 	err = row.Scan(&originalURL)
 	if err != nil {
@@ -111,16 +112,14 @@ func (db *DB) GetURL(ctx context.Context, shortURL string) (originalURL string, 
 }
 
 // Save saves tuple with shortURL, URL and UUID
-func (db *DB) Save(ctx context.Context, shortURL string, originalURL string) error {
+func (db *DB) Save(ctx context.Context, userUUID uuid.UUID, shortURL string, originalURL string) error {
 
 	if shortURL == "" || originalURL == "" {
 		return service.ErrEmptyShortURLorURL
 	}
 
 	const (
-		queryStmtInsert        = `INSERT INTO urls(short_url, original_url) VALUES ($1, $2)`
-		queryStmtCheckShortURL = `SELECT short_url FROM urls WHERE short_url = $1 LIMIT 1`
-		queryStmtCheckURL      = `SELECT original_url FROM urls WHERE original_url = $1 LIMIT 1`
+		queryStmtInsert = `INSERT INTO urls(short_url, original_url, user_uuid) VALUES ($1, $2, $3)`
 	)
 
 	start := time.Now()
@@ -129,12 +128,12 @@ func (db *DB) Save(ctx context.Context, shortURL string, originalURL string) err
 		db.zlog.Debug().Msgf("request execution duration: %s", elapsed)
 	}()
 
-	_, err := db.pool.Exec(ctx, queryStmtInsert, shortURL, originalURL)
+	_, err := db.pool.Exec(ctx, queryStmtInsert, shortURL, originalURL, userUUID)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
 			switch {
-			case strings.Contains(err.Error(), "urls_original_url_key"):
+			case strings.Contains(err.Error(), "urls_user_id_original_url_uq"):
 				return fmt.Errorf("error while saving URL %s: %w", originalURL, service.ErrURLExist)
 			case strings.Contains(err.Error(), "urls_short_url_key"):
 				return fmt.Errorf("error while saving URL %s: %w", shortURL, service.ErrShortURLExist)
@@ -149,8 +148,8 @@ func (db *DB) Save(ctx context.Context, shortURL string, originalURL string) err
 }
 
 // SaveBatch performs bulk insert to postgres database
-func (db *DB) SaveBatch(ctx context.Context, batch []model.URL) error {
-	query := `INSERT INTO urls (uuid, short_url, original_url) VALUES (@uuid, @shortURL, @originalURL)`
+func (db *DB) SaveBatch(ctx context.Context, userUUID uuid.UUID, batch []model.URL) error {
+	query := `INSERT INTO urls (uuid, short_url, original_url, user_uuid) VALUES (@uuid, @shortURL, @originalURL, @userUUID)`
 
 	insertBatch := &pgx.Batch{}
 	for _, v := range batch {
@@ -158,6 +157,7 @@ func (db *DB) SaveBatch(ctx context.Context, batch []model.URL) error {
 			"uuid":        v.UUID,
 			"shortURL":    v.ShortURL,
 			"originalURL": v.OriginalURL,
+			"userUUID":    userUUID,
 		}
 		insertBatch.Queue(query, args)
 	}
@@ -179,4 +179,31 @@ func (db *DB) SaveBatch(ctx context.Context, batch []model.URL) error {
 	}
 
 	return results.Close()
+}
+
+func (db *DB) GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[string]string, error) {
+	const queryStmt = `SELECT short_url, original_url FROM urls WHERE user_uuid = $1`
+
+	start := time.Now()
+	defer func() {
+		elapsed := time.Since(start)
+		db.zlog.Debug().Msgf("request execution duration: %s", elapsed)
+	}()
+
+	rows, err := db.pool.Query(ctx, queryStmt, userUUID)
+	if err != nil {
+		return nil, err
+	}
+	userShortURLs := make(map[string]string)
+	for rows.Next() {
+		var shortURL string
+		var originalURL string
+		err = rows.Scan(&shortURL, &originalURL)
+		if err != nil {
+			return nil, err
+		}
+		userShortURLs[shortURL] = originalURL
+	}
+
+	return userShortURLs, nil
 }
