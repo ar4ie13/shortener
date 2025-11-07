@@ -382,5 +382,4 @@ func (h Handler) deleteUsersShortURL(w http.ResponseWriter, r *http.Request) {
 	h.service.SendShortURLForDelete(r.Context(), userUUID, shortURLs)
 
 	w.WriteHeader(http.StatusAccepted)
-	return
 }

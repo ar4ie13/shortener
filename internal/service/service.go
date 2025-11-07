@@ -226,10 +226,7 @@ func (s *Service) collectShortURLs() chan map[uuid.UUID][]string {
 		go func() {
 			defer wg.Done()
 			for data := range chClosure {
-				select {
-				case finalCh <- data:
-
-				}
+				finalCh <- data
 			}
 		}()
 	}
@@ -240,7 +237,7 @@ func (s *Service) collectShortURLs() chan map[uuid.UUID][]string {
 	return finalCh
 }
 func (s *Service) deleteShortURLs() {
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
 	shortURLsForDelete := make(map[uuid.UUID][]string)
