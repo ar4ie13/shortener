@@ -48,7 +48,7 @@ func NewRepository(
 		zlog.Info().Msg("using FileStorage repository")
 		return filestore, nil
 	default:
-		zlog.Warn().Msg("using Memory repository")
+		zlog.Info().Msg("using Memory repository")
 		return memory.NewMemStorage(), nil
 	}
 }

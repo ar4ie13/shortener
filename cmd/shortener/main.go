@@ -27,7 +27,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("cannot initialize repository: %w", err)
 	}
-	srv := service.NewService(repo)
+	srv := service.NewService(repo, zlog.Logger)
 	hdlr := handlers.NewHandler(srv, cfg, authorize, zlog.Logger)
 
 	if err = hdlr.ListenAndServe(); err != nil {

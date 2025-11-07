@@ -7,9 +7,12 @@ import (
 	"math/rand"
 	"net/url"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/ar4ie13/shortener/internal/model"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog"
 )
 
 var (
@@ -18,6 +21,7 @@ var (
 	ErrEmptyShortURLorURL = errors.New("shortURL or URL cannot be empty")
 	ErrShortURLExist      = errors.New("shortURL already exist")
 	ErrInvalidUserUUID    = errors.New("invalid user UUID")
+	ErrShortURLIsDeleted  = errors.New("short URL is deleted")
 
 	ErrEmptyURL         = errors.New("URL template cannot be empty")
 	ErrWrongHTTPScheme  = errors.New("URL template must use http or https scheme")
@@ -40,20 +44,29 @@ type Repository interface {
 	Save(ctx context.Context, userUUID uuid.UUID, shortURL string, url string) error
 	SaveBatch(ctx context.Context, userUUID uuid.UUID, batch []model.URL) error
 	GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[string]string, error)
+	DeleteUserShortURLs(ctx context.Context, shortURLsToDelete map[uuid.UUID][]string) error
 }
 
 // Service is a main object of the package that implements Repository interface
 type Service struct {
-	repo Repository
+	repo         Repository
+	toDeleteChan []chan map[uuid.UUID][]string
+	zlog         zerolog.Logger
 }
 
 // NewService is a constructor for Service object
-func NewService(r Repository) *Service {
-	return &Service{r}
+func NewService(r Repository, zlog zerolog.Logger) *Service {
+	srv := &Service{
+		repo:         r,
+		toDeleteChan: []chan map[uuid.UUID][]string{},
+		zlog:         zlog,
+	}
+	go srv.deleteShortURLs()
+	return srv
 }
 
 // GetURL method gets URL by provided id
-func (s Service) GetURL(ctx context.Context, userUUID uuid.UUID, shortURL string) (string, error) {
+func (s *Service) GetURL(ctx context.Context, userUUID uuid.UUID, shortURL string) (string, error) {
 	if shortURL == "" {
 		return "", errEmptyID
 	}
@@ -67,7 +80,7 @@ func (s Service) GetURL(ctx context.Context, userUUID uuid.UUID, shortURL string
 }
 
 // GetUserShortURLs method gets all shortURLs and URL saved by user
-func (s Service) GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[string]string, error) {
+func (s *Service) GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[string]string, error) {
 
 	result, err := s.repo.GetUserShortURLs(ctx, userUUID)
 	if err != nil {
@@ -78,7 +91,7 @@ func (s Service) GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[
 }
 
 // SaveURL generates shortURL for non-existent URL and stores it in the Repository
-func (s Service) SaveURL(ctx context.Context, userUUID uuid.UUID, urlLink string) (slug string, err error) {
+func (s *Service) SaveURL(ctx context.Context, userUUID uuid.UUID, urlLink string) (slug string, err error) {
 
 	urlLink = strings.TrimRight(urlLink, "/")
 
@@ -136,7 +149,7 @@ func (s Service) SaveURL(ctx context.Context, userUUID uuid.UUID, urlLink string
 }
 
 // SaveBatch saves batch of jsonl rows to the repository
-func (s Service) SaveBatch(ctx context.Context, userUUID uuid.UUID, batch []model.URL) ([]model.URL, error) {
+func (s *Service) SaveBatch(ctx context.Context, userUUID uuid.UUID, batch []model.URL) ([]model.URL, error) {
 	result := make([]model.URL, len(batch))
 	for i := range batch {
 		slug, err := generateShortURL(shortURLLen)
@@ -192,4 +205,64 @@ func generateShortURL(length int) (string, error) {
 	}
 
 	return string(shortURL), nil
+}
+
+func (s *Service) SendShortURLForDelete(_ context.Context, userUUID uuid.UUID, shortURLs []string) {
+	data := make(chan map[uuid.UUID][]string, 1)
+	defer close(data)
+	data <- map[uuid.UUID][]string{userUUID: shortURLs}
+	s.toDeleteChan = append(s.toDeleteChan, data)
+}
+
+func (s *Service) collectShortURLs() chan map[uuid.UUID][]string {
+
+	finalCh := make(chan map[uuid.UUID][]string)
+
+	var wg sync.WaitGroup
+
+	for _, ch := range s.toDeleteChan {
+		chClosure := ch
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for data := range chClosure {
+				select {
+				case finalCh <- data:
+
+				}
+			}
+		}()
+	}
+	go func() {
+		wg.Wait()
+		close(finalCh)
+	}()
+	return finalCh
+}
+func (s *Service) deleteShortURLs() {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	shortURLsForDelete := make(map[uuid.UUID][]string)
+	var ch = make(chan map[uuid.UUID][]string)
+	for {
+		select {
+		case toDelete := <-ch:
+			for k, v := range toDelete {
+				shortURLsForDelete[k] = append(shortURLsForDelete[k], v...)
+			}
+
+		case <-ticker.C:
+			ch = s.collectShortURLs()
+			if len(shortURLsForDelete) == 0 {
+				continue
+			}
+			err := s.repo.DeleteUserShortURLs(context.TODO(), shortURLsForDelete)
+			if err != nil {
+				s.zlog.Err(err).Msg("failed to delete short urls")
+			}
+			shortURLsForDelete = make(map[uuid.UUID][]string)
+		}
+	}
+
 }

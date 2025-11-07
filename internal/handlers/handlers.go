@@ -21,6 +21,7 @@ type Service interface {
 	SaveURL(ctx context.Context, userUUID uuid.UUID, url string) (slug string, err error)
 	SaveBatch(ctx context.Context, userUUID uuid.UUID, batch []model.URL) ([]model.URL, error)
 	GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[string]string, error)
+	SendShortURLForDelete(ctx context.Context, userUUID uuid.UUID, shortURLs []string)
 }
 
 // Auth used for authentication
@@ -68,6 +69,7 @@ func (h Handler) ListenAndServe() error {
 			router.Post("/shorten", h.postURLJSON)
 			router.Post("/shorten/batch", h.postURLJSONBatch)
 			router.Get("/user/urls", h.getUsersShortURL)
+			router.Delete("/user/urls", h.deleteUsersShortURL)
 		})
 	})
 	h.zlog.Info().Msgf("listening on %v\nURL Template: %v\nLog Level: %v", h.cfg.GetLocalServerAddr(), h.cfg.GetShortURLTemplate(), h.cfg.GetLogLevel())
@@ -100,6 +102,8 @@ func (h Handler) getStatusCode(err error) (statusCode int) {
 		return http.StatusConflict
 	case errors.Is(err, service.ErrNotFound):
 		return http.StatusNoContent
+	case errors.Is(err, service.ErrShortURLIsDeleted):
+		return http.StatusGone
 	default:
 		return http.StatusInternalServerError
 	}
@@ -219,6 +223,7 @@ func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
 // getURL handles get requests and redirects to the URL by provided shortURL if it is found in Repository
 func (h Handler) getURL(w http.ResponseWriter, r *http.Request) {
 	userUUID, err := h.getUserUUIDFromRequest(r)
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
@@ -226,7 +231,8 @@ func (h Handler) getURL(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	url, err := h.service.GetURL(r.Context(), userUUID, id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		statusCode := h.getStatusCode(err)
+		http.Error(w, err.Error(), statusCode)
 		return
 	}
 	w.Header().Set("Location", url)
@@ -345,4 +351,36 @@ func (h Handler) getUsersShortURL(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+func (h Handler) deleteUsersShortURL(w http.ResponseWriter, r *http.Request) {
+	userUUID, err := h.getUserUUIDFromRequest(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		h.zlog.Debug().Msgf("error getting user UUID: %v", err)
+	}
+
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Error reading request body", http.StatusInternalServerError)
+		h.zlog.Debug().Msgf("Error reading body: %v", err)
+		return
+	}
+	defer r.Body.Close() // Ensure the body is closed
+
+	// Declare a slice to unmarshal the JSON into
+	var shortURLs []string
+
+	// Unmarshal the JSON bytes into the Go slice
+	err = json.Unmarshal(bodyBytes, &shortURLs)
+	if err != nil {
+		http.Error(w, "Error unmarshalling JSON", http.StatusBadRequest)
+		h.zlog.Debug().Msgf("Error unmarshalling JSON: %v", err)
+		return
+	}
+
+	h.service.SendShortURLForDelete(r.Context(), userUUID, shortURLs)
+
+	w.WriteHeader(http.StatusAccepted)
+	return
 }

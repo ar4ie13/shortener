@@ -24,6 +24,8 @@ type UUIDMemStore map[uuid.UUID]string
 // UserUUIDSlugMemStore stores UserUUID:shortURL:URL
 type UserUUIDSlugMemStore map[uuid.UUID]SlugMemStore
 
+type IsSlugDeletedMemStore map[string]bool
+
 // MemStorage is the main object for the package repository
 type MemStorage struct {
 	SlugMemStore
@@ -31,23 +33,29 @@ type MemStorage struct {
 	UserUUIDURLMemStore
 	UUIDMemStore
 	UserUUIDSlugMemStore
+	IsSlugDeletedMemStore
 }
 
 // NewMemStorage is a constructor for MemStorage object
 func NewMemStorage() *MemStorage {
 	return &MemStorage{
-		SlugMemStore:         make(map[string]string),
-		URLMemStore:          make(map[string]string),
-		UserUUIDURLMemStore:  make(map[uuid.UUID]URLMemStore),
-		UUIDMemStore:         make(map[uuid.UUID]string),
-		UserUUIDSlugMemStore: make(map[uuid.UUID]SlugMemStore),
+		SlugMemStore:          make(map[string]string),
+		URLMemStore:           make(map[string]string),
+		UserUUIDURLMemStore:   make(map[uuid.UUID]URLMemStore),
+		UUIDMemStore:          make(map[uuid.UUID]string),
+		UserUUIDSlugMemStore:  make(map[uuid.UUID]SlugMemStore),
+		IsSlugDeletedMemStore: make(map[string]bool),
 	}
 }
 
 // GetURL method is used to get URL (link) from the repository map
 func (repo *MemStorage) GetURL(_ context.Context, shortURL string) (string, error) {
 	if v, ok := repo.SlugMemStore[shortURL]; ok {
-		return v, nil
+		if repo.IsSlugDeletedMemStore[shortURL] {
+			return "", service.ErrShortURLIsDeleted
+		} else {
+			return v, nil
+		}
 	}
 
 	return "", service.ErrNotFound
@@ -56,7 +64,10 @@ func (repo *MemStorage) GetURL(_ context.Context, shortURL string) (string, erro
 // GetShortURL method is used to get shortURL from the repository map
 func (repo *MemStorage) GetShortURL(_ context.Context, originalURL string) (string, error) {
 	if v, ok := repo.URLMemStore[originalURL]; ok {
-		return v, nil
+		if !repo.IsSlugDeletedMemStore[v] {
+			return v, nil
+		}
+
 	}
 
 	return "", service.ErrNotFound
@@ -64,8 +75,11 @@ func (repo *MemStorage) GetShortURL(_ context.Context, originalURL string) (stri
 
 // existsURL check if URL exist in the map
 func (repo *MemStorage) existsURL(url string) bool {
-	if _, ok := repo.URLMemStore[url]; ok {
-		return true
+	if v, ok := repo.URLMemStore[url]; ok {
+		if !repo.IsSlugDeletedMemStore[v] {
+			return true
+		}
+
 	}
 
 	return false
@@ -74,7 +88,9 @@ func (repo *MemStorage) existsURL(url string) bool {
 // existsShortURL check if URL exist in the map
 func (repo *MemStorage) existsShortURL(shortURL string) bool {
 	if _, ok := repo.SlugMemStore[shortURL]; ok {
-		return true
+		if !repo.IsSlugDeletedMemStore[shortURL] {
+			return true
+		}
 	}
 
 	return false
@@ -106,6 +122,7 @@ func (repo *MemStorage) Save(_ context.Context, userUUID uuid.UUID, shortURL str
 		repo.UserUUIDSlugMemStore[userUUID] = make(SlugMemStore)
 	}
 	repo.UserUUIDSlugMemStore[userUUID][shortURL] = url
+	repo.IsSlugDeletedMemStore[shortURL] = false
 
 	return nil
 }
@@ -137,16 +154,41 @@ func (repo *MemStorage) SaveBatch(_ context.Context, userUUID uuid.UUID, batch [
 		repo.UserUUIDSlugMemStore[userUUID][result[i].ShortURL] = batch[i].OriginalURL
 		repo.UserUUIDURLMemStore[userUUID][batch[i].OriginalURL] = batch[i].ShortURL
 		repo.UUIDMemStore[batch[i].UUID] = batch[i].ShortURL
+		repo.IsSlugDeletedMemStore[batch[i].ShortURL] = false
 	}
 
 	return nil
 }
 
 func (repo *MemStorage) GetUserShortURLs(_ context.Context, userUUID uuid.UUID) (map[string]string, error) {
-
-	if v, ok := repo.UserUUIDSlugMemStore[userUUID]; ok {
-		return v, nil
+	result := make(SlugMemStore)
+	if _, ok := repo.UserUUIDSlugMemStore[userUUID]; !ok {
+		return nil, service.ErrNotFound
 	}
 
-	return nil, service.ErrNotFound
+	for slug, url := range repo.UserUUIDSlugMemStore[userUUID] {
+		if !repo.IsSlugDeletedMemStore[slug] {
+			result[slug] = url
+		}
+	}
+
+	return result, nil
+}
+
+func (repo *MemStorage) DeleteUserShortURLs(_ context.Context, shortURLsToDelete map[uuid.UUID][]string) error {
+	for userUUID, slugs := range shortURLsToDelete {
+
+		if _, ok := repo.UserUUIDSlugMemStore[userUUID]; !ok {
+			return service.ErrInvalidUserUUID
+		}
+		for _, slug := range slugs {
+			if repo.UserUUIDSlugMemStore[userUUID][slug] != "" {
+				if _, ok := repo.UserUUIDSlugMemStore[userUUID][slug]; ok {
+					repo.IsSlugDeletedMemStore[slug] = true
+				}
+			}
+		}
+	}
+
+	return nil
 }
