@@ -33,8 +33,9 @@ var (
 )
 
 const (
-	randGenerateSymbols = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	shortURLLen         = 8
+	randGenerateSymbols  = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	shortURLLen          = 8
+	timeToCollectDeleted = 2 * time.Second
 )
 
 // Repository interface used to interact with repository package to store or retrieve values
@@ -81,7 +82,6 @@ func (s *Service) GetURL(ctx context.Context, userUUID uuid.UUID, shortURL strin
 
 // GetUserShortURLs method gets all shortURLs and URL saved by user
 func (s *Service) GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[string]string, error) {
-
 	result, err := s.repo.GetUserShortURLs(ctx, userUUID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get short urls: %w", err)
@@ -92,7 +92,6 @@ func (s *Service) GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map
 
 // SaveURL generates shortURL for non-existent URL and stores it in the Repository
 func (s *Service) SaveURL(ctx context.Context, userUUID uuid.UUID, urlLink string) (slug string, err error) {
-
 	urlLink = strings.TrimRight(urlLink, "/")
 
 	if urlLink == "" {
@@ -207,6 +206,7 @@ func generateShortURL(length int) (string, error) {
 	return string(shortURL), nil
 }
 
+// SendShortURLForDelete writes userUUID and slugs for deletion to toDeleteChan slice of channels
 func (s *Service) SendShortURLForDelete(_ context.Context, userUUID uuid.UUID, shortURLs []string) {
 	data := make(chan map[uuid.UUID][]string, 1)
 	defer close(data)
@@ -214,8 +214,8 @@ func (s *Service) SendShortURLForDelete(_ context.Context, userUUID uuid.UUID, s
 	s.toDeleteChan = append(s.toDeleteChan, data)
 }
 
+// collectShortURLs aggregates all channels from toDeleteChan slice into resulting one
 func (s *Service) collectShortURLs() chan map[uuid.UUID][]string {
-
 	finalCh := make(chan map[uuid.UUID][]string)
 
 	var wg sync.WaitGroup
@@ -236,8 +236,10 @@ func (s *Service) collectShortURLs() chan map[uuid.UUID][]string {
 	}()
 	return finalCh
 }
+
+// deleteShortURLs runs as a separate goroutine and periodically send batch of slugs for deletion to repository
 func (s *Service) deleteShortURLs() {
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(timeToCollectDeleted)
 	defer ticker.Stop()
 
 	shortURLsForDelete := make(map[uuid.UUID][]string)
@@ -261,5 +263,4 @@ func (s *Service) deleteShortURLs() {
 			shortURLsForDelete = make(map[uuid.UUID][]string)
 		}
 	}
-
 }

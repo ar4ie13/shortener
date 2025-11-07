@@ -353,6 +353,7 @@ func (h Handler) getUsersShortURL(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// deleteUsersShortURL handles users short url deletion and places slugs into the channel in service
 func (h Handler) deleteUsersShortURL(w http.ResponseWriter, r *http.Request) {
 	userUUID, err := h.getUserUUIDFromRequest(r)
 	if err != nil {

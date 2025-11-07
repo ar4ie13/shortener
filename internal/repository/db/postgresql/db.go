@@ -182,6 +182,7 @@ func (db *DB) SaveBatch(ctx context.Context, userUUID uuid.UUID, batch []model.U
 	return results.Close()
 }
 
+// GetUserShortURLs get slugs from db for the provider userUUID
 func (db *DB) GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[string]string, error) {
 	const queryStmt = `SELECT short_url, original_url FROM urls WHERE user_uuid = $1 and is_deleted = false`
 
@@ -223,6 +224,8 @@ func (db *DB) GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[str
 
 	return userShortURLs, nil
 }
+
+// DeleteUserShortURLs prepares batch for update IsDeleted field in db from false to true if exists
 func (db *DB) DeleteUserShortURLs(ctx context.Context, shortURLsToDelete map[uuid.UUID][]string) error {
 
 	query := `UPDATE urls SET is_deleted = true WHERE short_url = @shortURL AND user_uuid = @userUUID`
@@ -243,10 +246,6 @@ func (db *DB) DeleteUserShortURLs(ctx context.Context, shortURLsToDelete map[uui
 	for range shortURLsToDelete {
 		_, err := results.Exec()
 		if err != nil {
-			//var pgErr *pgconn.PgError
-			//if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
-			//	return fmt.Errorf("error while saving URL %s: %w", v.OriginalURL, err)
-			//}
 			return fmt.Errorf("unable to update row: %w", err)
 		}
 	}

@@ -13,6 +13,7 @@ type contextUUIDKey string
 // userUUIDKey is a unique key for user_id in context
 const userUUIDKey contextUUIDKey = "user_id"
 
+// authMiddleware used as middleware for authentication
 func (h Handler) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("user_id")

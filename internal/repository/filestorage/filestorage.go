@@ -204,6 +204,7 @@ func (fs *FileStorage) SaveBatch(ctx context.Context, userUUID uuid.UUID, batch 
 	return nil
 }
 
+// GetUserShortURLs return short URLs for specified user
 func (fs *FileStorage) GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[string]string, error) {
 	result, err := fs.m.GetUserShortURLs(ctx, userUUID)
 	if err != nil {
@@ -212,6 +213,7 @@ func (fs *FileStorage) GetUserShortURLs(ctx context.Context, userUUID uuid.UUID)
 	return result, nil
 }
 
+// DeleteUserShortURLs mark short URLs as Deleted in storage
 func (fs *FileStorage) DeleteUserShortURLs(ctx context.Context, shortURLsToDelete map[uuid.UUID][]string) error {
 	err := fs.m.DeleteUserShortURLs(ctx, shortURLsToDelete)
 	if err != nil {
@@ -253,7 +255,6 @@ func (fs *FileStorage) DeleteUserShortURLs(ctx context.Context, shortURLsToDelet
 			}
 		}
 	}
-	fmt.Println(fs.m.IsSlugDeletedMemStore)
-	return nil
 
+	return nil
 }

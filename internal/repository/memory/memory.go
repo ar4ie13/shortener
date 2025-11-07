@@ -160,6 +160,7 @@ func (repo *MemStorage) SaveBatch(_ context.Context, userUUID uuid.UUID, batch [
 	return nil
 }
 
+// GetUserShortURLs return short URLs for specified user
 func (repo *MemStorage) GetUserShortURLs(_ context.Context, userUUID uuid.UUID) (map[string]string, error) {
 	result := make(SlugMemStore)
 	if _, ok := repo.UserUUIDSlugMemStore[userUUID]; !ok {
@@ -175,6 +176,7 @@ func (repo *MemStorage) GetUserShortURLs(_ context.Context, userUUID uuid.UUID) 
 	return result, nil
 }
 
+// DeleteUserShortURLs mark short URLs as Deleted in storage
 func (repo *MemStorage) DeleteUserShortURLs(_ context.Context, shortURLsToDelete map[uuid.UUID][]string) error {
 	for userUUID, slugs := range shortURLsToDelete {
 

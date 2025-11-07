@@ -10,25 +10,29 @@ import (
 	"github.com/google/uuid"
 )
 
-type Auth struct {
-	Claims Claims
-}
-
-type Claims struct {
-	jwt.RegisteredClaims
-	UserUUID uuid.UUID
-}
-
-func NewAuth() *Auth {
-	return &Auth{}
-}
-
 const (
 	TokenExpiration = time.Hour * 24
 	// SecretKey TODO: replace const with value from repository in real project
 	SecretKey = "nHhjHgahbioHBGbBHJ"
 )
 
+// Auth describes claims required for authorization and provisioning of JWT token
+type Auth struct {
+	Claims Claims
+}
+
+// Claims consists of registered claims and personal UserUUID claim
+type Claims struct {
+	jwt.RegisteredClaims
+	UserUUID uuid.UUID
+}
+
+// NewAuth creates Auth object
+func NewAuth() *Auth {
+	return &Auth{}
+}
+
+// GenerateUserUUID generates new UUID for user
 func (a Auth) GenerateUserUUID() uuid.UUID {
 	return uuid.New()
 }
