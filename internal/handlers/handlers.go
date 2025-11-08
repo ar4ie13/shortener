@@ -9,11 +9,22 @@ import (
 	"net/http"
 
 	"github.com/ar4ie13/shortener/internal/model"
-	"github.com/ar4ie13/shortener/internal/service"
+	"github.com/ar4ie13/shortener/internal/myerrors"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 )
+
+// errorStatusMap used for fast error check in get
+var errorStatusMap = map[error]int{
+	myerrors.ErrEmptyURL:          http.StatusBadRequest,
+	myerrors.ErrInvalidURLFormat:  http.StatusBadRequest,
+	myerrors.ErrWrongHTTPScheme:   http.StatusBadRequest,
+	myerrors.ErrMustIncludeHost:   http.StatusBadRequest,
+	myerrors.ErrURLExist:          http.StatusConflict,
+	myerrors.ErrNotFound:          http.StatusNoContent,
+	myerrors.ErrShortURLIsDeleted: http.StatusGone,
+}
 
 // Service interface interacts with service package
 type Service interface {
@@ -93,20 +104,20 @@ func (h Handler) getUserUUIDFromRequest(r *http.Request) (uuid.UUID, error) {
 }
 
 // getStatusCode process error and return the correlated status code
-func (h Handler) getStatusCode(err error) (statusCode int) {
-	switch {
-	case errors.Is(err, service.ErrEmptyURL) || errors.Is(err, service.ErrInvalidURLFormat) ||
-		errors.Is(err, service.ErrWrongHTTPScheme) || errors.Is(err, service.ErrMustIncludeHost):
-		return http.StatusBadRequest
-	case errors.Is(err, service.ErrURLExist):
-		return http.StatusConflict
-	case errors.Is(err, service.ErrNotFound):
-		return http.StatusNoContent
-	case errors.Is(err, service.ErrShortURLIsDeleted):
-		return http.StatusGone
-	default:
-		return http.StatusInternalServerError
+func (h Handler) getStatusCode(err error) int {
+	// fast error check
+	if status, exists := errorStatusMap[err]; exists {
+		return status
 	}
+
+	// For wrapped errors
+	for errType, status := range errorStatusMap {
+		if errors.Is(err, errType) {
+			return status
+		}
+	}
+
+	return http.StatusInternalServerError
 }
 
 // postURL handles POST requests from clients and receives URL from body to store it in the Repository via Service

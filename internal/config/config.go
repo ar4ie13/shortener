@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	authconf "github.com/ar4ie13/shortener/internal/auth/config"
 	pgconf "github.com/ar4ie13/shortener/internal/repository/db/postgresql/config"
 	fileconf "github.com/ar4ie13/shortener/internal/repository/filestorage/config"
 
@@ -37,6 +38,7 @@ type Config struct {
 	LogLevel         LogLevel
 	FilePath         fileconf.Config
 	PostgresDSN      pgconf.Config
+	AuthConf         authconf.Config
 }
 
 // NewConfig constructor for Config
@@ -101,18 +103,22 @@ func (l *LogLevel) Set(value string) error {
 
 // InitConfig initialize configuration
 func (c *Config) InitConfig() {
-
+	var err error
 	defaultServerAddr := "localhost:8080"
 	defaultURL := "http://localhost:8080"
 	defaultLogLevel := LogLevel{Level: zerolog.InfoLevel}
 	defaultFileStorage := ""
 	defaultDatabaseDSN := ""
+	defaultSecretKey := "nHhjHgahbioHBGbBHJ"
+	defaultTokenExpiration := time.Hour * 24
 
 	flag.StringVar(&c.LocalServerAddr, "a", defaultServerAddr, "local server address")
 	flag.Var(&c.ShortURLTemplate, "b", "short url template")
 	flag.Var(&c.LogLevel, "l", "log level (debug, info, warn, error, fatal, panic)")
 	flag.StringVar(&c.FilePath.FilePath, "f", defaultFileStorage, "file storage path")
 	flag.StringVar(&c.PostgresDSN.DatabaseDSN, "d", defaultDatabaseDSN, "database DSN")
+	flag.StringVar(&c.AuthConf.SecretKey, "k", defaultSecretKey, "secret key")
+	flag.DurationVar(&c.AuthConf.TokenExpiration, "e", defaultTokenExpiration, "token expiration")
 
 	if err := c.ShortURLTemplate.Set(defaultURL); err != nil {
 		log.Fatal().Err(err).Msg("Failed to set default URL")
@@ -154,6 +160,18 @@ func (c *Config) InitConfig() {
 
 	if databaseDSN := os.Getenv("DATABASE_DSN"); databaseDSN != "" {
 		c.PostgresDSN.DatabaseDSN = databaseDSN
+	}
+
+	if secretKey := os.Getenv("SECRET_KEY"); secretKey != "" {
+		c.AuthConf.SecretKey = secretKey
+	}
+
+	if tokenExpirationStr := os.Getenv("TOKEN_EXPIRATION"); tokenExpirationStr != "" {
+		c.AuthConf.TokenExpiration, err = time.ParseDuration(tokenExpirationStr)
+		if err != nil {
+			log.Fatal().Err(err).Msg("cannot parse token expiration environment variable")
+		}
+
 	}
 }
 

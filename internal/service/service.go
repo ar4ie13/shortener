@@ -11,25 +11,9 @@ import (
 	"time"
 
 	"github.com/ar4ie13/shortener/internal/model"
+	"github.com/ar4ie13/shortener/internal/myerrors"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
-)
-
-var (
-	ErrNotFound           = errors.New("not found")
-	ErrURLExist           = errors.New("URL already exist")
-	ErrEmptyShortURLorURL = errors.New("shortURL or URL cannot be empty")
-	ErrShortURLExist      = errors.New("shortURL already exist")
-	ErrInvalidUserUUID    = errors.New("invalid user UUID")
-	ErrShortURLIsDeleted  = errors.New("short URL is deleted")
-
-	ErrEmptyURL         = errors.New("URL template cannot be empty")
-	ErrWrongHTTPScheme  = errors.New("URL template must use http or https scheme")
-	ErrMustIncludeHost  = errors.New("URL template must include a host")
-	ErrInvalidURLFormat = errors.New("invalid URL format")
-
-	errEmptyID        = errors.New("short url cannot be empty")
-	errShortURLLength = errors.New("short url length is too small")
 )
 
 const (
@@ -69,7 +53,7 @@ func NewService(r Repository, zlog zerolog.Logger) *Service {
 // GetURL method gets URL by provided id
 func (s *Service) GetURL(ctx context.Context, userUUID uuid.UUID, shortURL string) (string, error) {
 	if shortURL == "" {
-		return "", errEmptyID
+		return "", myerrors.ErrEmptyID
 	}
 
 	getURL, err := s.repo.GetURL(ctx, shortURL)
@@ -95,23 +79,23 @@ func (s *Service) SaveURL(ctx context.Context, userUUID uuid.UUID, urlLink strin
 	urlLink = strings.TrimRight(urlLink, "/")
 
 	if urlLink == "" {
-		return "", ErrEmptyURL
+		return "", myerrors.ErrEmptyURL
 	}
 
 	// Validate the URL format
 	parsedURL, err := url.Parse(urlLink)
 	if err != nil {
-		return "", ErrInvalidURLFormat
+		return "", myerrors.ErrInvalidURLFormat
 	}
 
 	// Ensure the scheme is http or https
 	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-		return "", ErrWrongHTTPScheme
+		return "", myerrors.ErrWrongHTTPScheme
 	}
 
 	// Ensure the host is not empty
 	if parsedURL.Host == "" {
-		return "", ErrMustIncludeHost
+		return "", myerrors.ErrMustIncludeHost
 	}
 
 	for attempt := 1; attempt <= 3; attempt++ {
@@ -130,16 +114,16 @@ func (s *Service) SaveURL(ctx context.Context, userUUID uuid.UUID, urlLink strin
 			return slug, nil
 		}
 
-		if errors.Is(err, ErrURLExist) {
+		if errors.Is(err, myerrors.ErrURLExist) {
 			slug, err = s.repo.GetShortURL(ctx, urlLink)
 			if err != nil {
-				return "", ErrNotFound
+				return "", myerrors.ErrNotFound
 			}
-			return slug, ErrURLExist
+			return slug, myerrors.ErrURLExist
 		}
 
 		if attempt == 3 {
-			if errors.Is(err, ErrShortURLExist) {
+			if errors.Is(err, myerrors.ErrShortURLExist) {
 				return "", fmt.Errorf("failed to save URL to repository: %w", err)
 			}
 		}
@@ -159,23 +143,23 @@ func (s *Service) SaveBatch(ctx context.Context, userUUID uuid.UUID, batch []mod
 		urlLink := strings.TrimRight(batch[i].OriginalURL, "/")
 
 		if urlLink == "" {
-			return nil, fmt.Errorf("%w: %s", ErrEmptyURL, batch[i].OriginalURL)
+			return nil, fmt.Errorf("%w: %s", myerrors.ErrEmptyURL, batch[i].OriginalURL)
 		}
 
 		// Validate the URL format
 		parsedURL, err := url.Parse(batch[i].OriginalURL)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %s", ErrInvalidURLFormat, batch[i].OriginalURL)
+			return nil, fmt.Errorf("%w: %s", myerrors.ErrInvalidURLFormat, batch[i].OriginalURL)
 		}
 
 		// Ensure the scheme is http or https
 		if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-			return nil, ErrWrongHTTPScheme
+			return nil, myerrors.ErrWrongHTTPScheme
 		}
 
 		// Ensure the host is not empty
 		if parsedURL.Host == "" {
-			return nil, ErrMustIncludeHost
+			return nil, myerrors.ErrMustIncludeHost
 		}
 		result[i] = model.URL{
 			ShortURL:    slug,
@@ -195,7 +179,7 @@ func (s *Service) SaveBatch(ctx context.Context, userUUID uuid.UUID, batch []mod
 // generateShortURL is a sub-function for SaveURL
 func generateShortURL(length int) (string, error) {
 	if length <= 0 {
-		return "", errShortURLLength
+		return "", myerrors.ErrShortURLLength
 	}
 
 	shortURL := make([]byte, length)

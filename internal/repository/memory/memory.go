@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ar4ie13/shortener/internal/model"
-	"github.com/ar4ie13/shortener/internal/service"
+	"github.com/ar4ie13/shortener/internal/myerrors"
 	"github.com/google/uuid"
 )
 
@@ -52,13 +52,13 @@ func NewMemStorage() *MemStorage {
 func (repo *MemStorage) GetURL(_ context.Context, shortURL string) (string, error) {
 	if v, ok := repo.SlugMemStore[shortURL]; ok {
 		if repo.IsSlugDeletedMemStore[shortURL] {
-			return "", service.ErrShortURLIsDeleted
+			return "", myerrors.ErrShortURLIsDeleted
 		} else {
 			return v, nil
 		}
 	}
 
-	return "", service.ErrNotFound
+	return "", myerrors.ErrNotFound
 }
 
 // GetShortURL method is used to get shortURL from the repository map
@@ -70,7 +70,7 @@ func (repo *MemStorage) GetShortURL(_ context.Context, originalURL string) (stri
 
 	}
 
-	return "", service.ErrNotFound
+	return "", myerrors.ErrNotFound
 }
 
 // existsURL check if URL exist in the map
@@ -100,15 +100,15 @@ func (repo *MemStorage) existsShortURL(shortURL string) bool {
 func (repo *MemStorage) Save(_ context.Context, userUUID uuid.UUID, shortURL string, url string) error {
 
 	if shortURL == "" || url == "" {
-		return service.ErrEmptyShortURLorURL
+		return myerrors.ErrEmptyShortURLorURL
 	}
 
 	if repo.existsURL(url) {
-		return fmt.Errorf("%w :%s", service.ErrURLExist, url)
+		return fmt.Errorf("%w :%s", myerrors.ErrURLExist, url)
 	}
 
 	if repo.existsShortURL(shortURL) {
-		return fmt.Errorf("%w :%s", service.ErrShortURLExist, shortURL)
+		return fmt.Errorf("%w :%s", myerrors.ErrShortURLExist, shortURL)
 	}
 
 	repo.SlugMemStore[shortURL] = url
@@ -134,11 +134,11 @@ func (repo *MemStorage) SaveBatch(_ context.Context, userUUID uuid.UUID, batch [
 	for i := range batch {
 		switch {
 		case batch[i].ShortURL == "" || batch[i].OriginalURL == "":
-			return service.ErrEmptyShortURLorURL
+			return myerrors.ErrEmptyShortURLorURL
 		case repo.existsURL(batch[i].OriginalURL):
-			return fmt.Errorf("%w: %s", service.ErrURLExist, batch[i].OriginalURL)
+			return fmt.Errorf("%w: %s", myerrors.ErrURLExist, batch[i].OriginalURL)
 		case repo.existsShortURL(batch[i].ShortURL):
-			return fmt.Errorf("%w: %s", service.ErrShortURLExist, batch[i].ShortURL)
+			return fmt.Errorf("%w: %s", myerrors.ErrShortURLExist, batch[i].ShortURL)
 		}
 		result[i] = batch[i]
 	}
@@ -164,7 +164,7 @@ func (repo *MemStorage) SaveBatch(_ context.Context, userUUID uuid.UUID, batch [
 func (repo *MemStorage) GetUserShortURLs(_ context.Context, userUUID uuid.UUID) (map[string]string, error) {
 	result := make(SlugMemStore)
 	if _, ok := repo.UserUUIDSlugMemStore[userUUID]; !ok {
-		return nil, service.ErrNotFound
+		return nil, myerrors.ErrNotFound
 	}
 
 	for slug, url := range repo.UserUUIDSlugMemStore[userUUID] {
@@ -181,7 +181,7 @@ func (repo *MemStorage) DeleteUserShortURLs(_ context.Context, shortURLsToDelete
 	for userUUID, slugs := range shortURLsToDelete {
 
 		if _, ok := repo.UserUUIDSlugMemStore[userUUID]; !ok {
-			return service.ErrInvalidUserUUID
+			return myerrors.ErrInvalidUserUUID
 		}
 		for _, slug := range slugs {
 			if repo.UserUUIDSlugMemStore[userUUID][slug] != "" {

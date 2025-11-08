@@ -176,7 +176,8 @@ func TestFileStorage_Store(t *testing.T) {
 					FilePath: "test.jsonl",
 				},
 				urlMapping: model.URL{
-					UUID:        uuid.UUID{},
+					UUID: uuid.UUID{},
+					
 					ShortURL:    "",
 					OriginalURL: "",
 				},

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/ar4ie13/shortener/internal/model"
+	"github.com/ar4ie13/shortener/internal/myerrors"
 	"github.com/ar4ie13/shortener/internal/service/internal/mockery"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
@@ -23,7 +24,7 @@ type HandyMockRepository struct {
 func (m *HandyMockRepository) GetURL(_ context.Context, id string) (string, error) {
 	url, exists := m.urls[id]
 	if !exists {
-		return "", ErrNotFound
+		return "", myerrors.ErrNotFound
 	}
 	return url, nil
 }
@@ -34,19 +35,19 @@ func (m *HandyMockRepository) GetShortURL(_ context.Context, urllink string) (st
 			return k, nil
 		}
 	}
-	return "", ErrNotFound
+	return "", myerrors.ErrNotFound
 }
 
 func (m *HandyMockRepository) Save(_ context.Context, userUUID uuid.UUID, id string, url string) error {
 	if id == "" || url == "" {
-		return ErrEmptyShortURLorURL
+		return myerrors.ErrEmptyShortURLorURL
 	}
 	if m.err != nil {
 		return m.err
 	}
 	for _, v := range m.urls {
 		if v == url {
-			return ErrURLExist
+			return myerrors.ErrURLExist
 		}
 	}
 	m.urls[id] = url
@@ -55,7 +56,7 @@ func (m *HandyMockRepository) Save(_ context.Context, userUUID uuid.UUID, id str
 func (m *HandyMockRepository) SaveBatch(_ context.Context, userUUID uuid.UUID, batch []model.URL) error {
 	for i := range batch {
 		if batch[i].ShortURL == "" || batch[i].OriginalURL == "" {
-			return ErrEmptyShortURLorURL
+			return myerrors.ErrEmptyShortURLorURL
 		}
 		if m.err != nil {
 			return m.err
@@ -113,7 +114,7 @@ func TestService_GenerateShortURL(t *testing.T) {
 			},
 
 			wantErr:    true,
-			wantErrMsg: ErrURLExist,
+			wantErrMsg: myerrors.ErrURLExist,
 		},
 		{
 			name: "Empty test",
@@ -130,7 +131,7 @@ func TestService_GenerateShortURL(t *testing.T) {
 			},
 
 			wantErr:    true,
-			wantErrMsg: ErrEmptyURL,
+			wantErrMsg: myerrors.ErrEmptyURL,
 		},
 	}
 	for _, tt := range tests {
@@ -229,16 +230,16 @@ func TestService_GetURL_Mockery(t *testing.T) {
 			mockReturnURL:  "",
 			mockReturnErr:  nil,
 			expectedURL:    "",
-			expectedErr:    errEmptyID,
+			expectedErr:    myerrors.ErrEmptyID,
 			shouldCallRepo: false,
 		},
 		{
 			name:           "not found",
 			shortURL:       "abc",
 			mockReturnURL:  "",
-			mockReturnErr:  ErrNotFound,
+			mockReturnErr:  myerrors.ErrNotFound,
 			expectedURL:    "",
-			expectedErr:    ErrNotFound, // The function wraps this error
+			expectedErr:    myerrors.ErrNotFound, // The function wraps this error
 			shouldCallRepo: true,
 		},
 	}
@@ -257,7 +258,7 @@ func TestService_GetURL_Mockery(t *testing.T) {
 			assert.Equal(t, tt.expectedURL, result)
 			if tt.expectedErr != nil {
 				require.Error(t, err)
-				if errors.Is(tt.expectedErr, ErrNotFound) || errors.Is(tt.expectedErr, ErrEmptyShortURLorURL) {
+				if errors.Is(tt.expectedErr, myerrors.ErrNotFound) || errors.Is(tt.expectedErr, myerrors.ErrEmptyShortURLorURL) {
 					assert.Contains(t, err.Error(), "failed to get URL")
 				}
 				assert.ErrorIs(t, err, tt.expectedErr)

@@ -5,20 +5,16 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ar4ie13/shortener/internal/service"
+	authconf "github.com/ar4ie13/shortener/internal/auth/config"
+	"github.com/ar4ie13/shortener/internal/myerrors"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
-)
-
-const (
-	TokenExpiration = time.Hour * 24
-	// SecretKey TODO: replace const with value from repository in real project
-	SecretKey = "nHhjHgahbioHBGbBHJ"
 )
 
 // Auth describes claims required for authorization and provisioning of JWT token
 type Auth struct {
 	Claims Claims
+	conf   authconf.Config
 }
 
 // Claims consists of registered claims and personal UserUUID claim
@@ -28,8 +24,10 @@ type Claims struct {
 }
 
 // NewAuth creates Auth object
-func NewAuth() *Auth {
-	return &Auth{}
+func NewAuth(conf authconf.Config) *Auth {
+	return &Auth{
+		conf: conf,
+	}
 }
 
 // GenerateUserUUID generates new UUID for user
@@ -43,14 +41,14 @@ func (a Auth) BuildJWTString(userUUID uuid.UUID) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			// token expiration date
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(TokenExpiration)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(a.conf.TokenExpiration)),
 		},
 		// personal claim
 		UserUUID: userUUID,
 	})
 
 	// creating signed token string
-	tokenString, err := token.SignedString([]byte(SecretKey))
+	tokenString, err := token.SignedString([]byte(a.conf.SecretKey))
 	if err != nil {
 		return "", err
 	}
@@ -76,7 +74,7 @@ func (a Auth) ValidateUserUUID(tokenString string) (uuid.UUID, error) {
 		}
 	}
 	if claims.UserUUID.String() == "" || claims.UserUUID == uuid.Nil {
-		return uuid.Nil, service.ErrInvalidUserUUID
+		return uuid.Nil, myerrors.ErrInvalidUserUUID
 	}
 
 	if !token.Valid {
@@ -92,7 +90,7 @@ func (a Auth) parseTokenString(tokenString string) (*Claims, *jwt.Token, error) 
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return []byte(SecretKey), nil
+		return []byte(a.conf.SecretKey), nil
 	})
 	if err != nil {
 		return claims, token, err

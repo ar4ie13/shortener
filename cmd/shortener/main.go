@@ -22,7 +22,7 @@ func main() {
 func run() error {
 	cfg := config.NewConfig()
 	zlog := logger.NewLogger(cfg.GetLogLevel())
-	authorize := auth.NewAuth()
+	authorize := auth.NewAuth(cfg.AuthConf)
 	repo, err := repository.NewRepository(context.Background(), cfg.FilePath, cfg.PostgresDSN, zlog.Logger)
 	if err != nil {
 		return fmt.Errorf("cannot initialize repository: %w", err)

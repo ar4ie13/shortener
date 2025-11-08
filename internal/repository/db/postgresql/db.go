@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/ar4ie13/shortener/internal/model"
+	"github.com/ar4ie13/shortener/internal/myerrors"
 	"github.com/ar4ie13/shortener/internal/repository/db/postgresql/config"
-	"github.com/ar4ie13/shortener/internal/service"
 	"github.com/google/uuid"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
@@ -76,7 +76,7 @@ func (db *DB) GetShortURL(ctx context.Context, originalURL string) (shortURL str
 	if err != nil {
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
-			return "", service.ErrNotFound
+			return "", myerrors.ErrNotFound
 		default:
 			return "", fmt.Errorf("failed to scan a response row: %w", err)
 		}
@@ -102,13 +102,13 @@ func (db *DB) GetURL(ctx context.Context, shortURL string) (originalURL string, 
 	if err != nil {
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
-			return "", service.ErrNotFound
+			return "", myerrors.ErrNotFound
 		default:
 			return "", fmt.Errorf("failed to scan a response row: %w", err)
 		}
 	}
 	if isDeleted {
-		return "", service.ErrShortURLIsDeleted
+		return "", myerrors.ErrShortURLIsDeleted
 	}
 
 	return originalURL, nil
@@ -118,7 +118,7 @@ func (db *DB) GetURL(ctx context.Context, shortURL string) (originalURL string, 
 func (db *DB) Save(ctx context.Context, userUUID uuid.UUID, shortURL string, originalURL string) error {
 
 	if shortURL == "" || originalURL == "" {
-		return service.ErrEmptyShortURLorURL
+		return myerrors.ErrEmptyShortURLorURL
 	}
 
 	const (
@@ -137,9 +137,9 @@ func (db *DB) Save(ctx context.Context, userUUID uuid.UUID, shortURL string, ori
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
 			switch {
 			case strings.Contains(err.Error(), "urls_original_url_key"):
-				return fmt.Errorf("error while saving URL %s: %w", originalURL, service.ErrURLExist)
+				return fmt.Errorf("error while saving URL %s: %w", originalURL, myerrors.ErrURLExist)
 			case strings.Contains(err.Error(), "urls_short_url_key"):
-				return fmt.Errorf("error while saving URL %s: %w", shortURL, service.ErrShortURLExist)
+				return fmt.Errorf("error while saving URL %s: %w", shortURL, myerrors.ErrShortURLExist)
 			}
 		}
 		return fmt.Errorf("failed to save URL: %w", err)
@@ -219,7 +219,7 @@ func (db *DB) GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[str
 	}
 
 	if len(userShortURLs) == 0 {
-		return nil, service.ErrNotFound
+		return nil, myerrors.ErrNotFound
 	}
 
 	return userShortURLs, nil
