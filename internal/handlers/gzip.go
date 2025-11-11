@@ -66,7 +66,7 @@ func (c *compressReader) Close() error {
 }
 
 // gzipMiddleware handles decompression of requests and compression of responses
-func gzipMiddleware(next http.Handler) http.Handler {
+func (h Handler) gzipMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ow := w
 

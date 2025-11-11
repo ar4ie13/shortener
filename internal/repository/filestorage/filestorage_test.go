@@ -81,7 +81,7 @@ func TestNewFileStorage(t *testing.T) {
 					Out:        os.Stdout,
 					TimeFormat: time.RFC3339,
 				}).With().Timestamp().Logger().Level(zerolog.DebugLevel),
-				mu: sync.Mutex{},
+				mu: sync.RWMutex{},
 			},
 		},
 	}
@@ -173,14 +173,15 @@ func TestFileStorage_Store(t *testing.T) {
 			// Create FileStorage with test data
 			storage := &FileStorage{
 				filePath: fileconf.Config{
-					FilePath: "../../../storage.jsonl",
+					FilePath: "test.jsonl",
 				},
 				urlMapping: model.URL{
-					UUID:        uuid.UUID{},
+					UUID: uuid.UUID{},
+					
 					ShortURL:    "",
 					OriginalURL: "",
 				},
-				mu: sync.Mutex{},
+				mu: sync.RWMutex{},
 			}
 
 			// Replace os.OpenFile with our mock
@@ -194,7 +195,7 @@ func TestFileStorage_Store(t *testing.T) {
 
 				// Should not panic
 				assert.NotPanics(t, func() {
-					err := storage.Store(tt.shortURL, tt.url)
+					err := storage.Store(tt.shortURL, uuid.New(), tt.url)
 					assert.NoError(t, err)
 				})
 

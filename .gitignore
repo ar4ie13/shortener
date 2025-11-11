@@ -28,5 +28,6 @@ vendor/
 # Makefile
 Makefile
 
-# storage.jsonl
+# json.l filestorage files
 storage.jsonl
+internal/repository/filestorage/test.jsonl

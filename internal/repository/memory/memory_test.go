@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ar4ie13/shortener/internal/service"
+	"github.com/ar4ie13/shortener/internal/myerrors"
 	"github.com/google/uuid"
 )
 
@@ -22,11 +22,11 @@ func TestNewMemStorage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewMemStorage(); len(got.URLMemStore) != tt.expectedMapLength || len(got.SlugMemStore) != tt.expectedMapLength {
+			if got := NewMemStorage(); len(got.UserUUIDURLMemStore) != tt.expectedMapLength || len(got.SlugMemStore) != tt.expectedMapLength {
 				t.Errorf("NewMemStorage() urlLib lenth = %v, want %v", got, tt.expectedMapLength)
 			}
-			if got := NewMemStorage(); got.SlugMemStore == nil || got.URLMemStore == nil {
-				t.Errorf("NewMemStorage() SlugMemStore or URLMemStore is nil")
+			if got := NewMemStorage(); got.SlugMemStore == nil || got.UserUUIDURLMemStore == nil {
+				t.Errorf("NewMemStorage() SlugMemStore or UserUUIDURLMemStore is nil")
 			}
 			if got := NewMemStorage(); got == nil {
 				t.Errorf("NewMemStorage() struct is nil")
@@ -83,7 +83,7 @@ func TestMemory_Get(t *testing.T) {
 			},
 			want:      "",
 			wantErr:   true,
-			wantError: service.ErrNotFound,
+			wantError: myerrors.ErrNotFound,
 		},
 		{
 			name: "Empty input parameter",
@@ -100,7 +100,7 @@ func TestMemory_Get(t *testing.T) {
 			},
 			want:      "",
 			wantErr:   true,
-			wantError: service.ErrNotFound,
+			wantError: myerrors.ErrNotFound,
 		},
 	}
 	for _, tt := range tests {
@@ -125,9 +125,12 @@ func TestMemory_Get(t *testing.T) {
 func TestMemory_Save(t *testing.T) {
 
 	type fields struct {
-		SlugMemStore map[string]string
-		URLMemStore  map[string]string
-		UUIDMemStore map[uuid.UUID]string
+		SlugMemStore          map[string]string
+		URLMemStore           map[string]string
+		UUIDMemStore          map[uuid.UUID]string
+		UserUUIDURLMemStore   map[uuid.UUID]URLMemStore
+		UserUUIDSlugMemStore  map[uuid.UUID]SlugMemStore
+		IsSlugDeletedMemStore IsSlugDeletedMemStore
 	}
 	type args struct {
 		slug string
@@ -149,7 +152,10 @@ func TestMemory_Save(t *testing.T) {
 				URLMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
-				UUIDMemStore: map[uuid.UUID]string{},
+				UUIDMemStore:          map[uuid.UUID]string{},
+				UserUUIDURLMemStore:   map[uuid.UUID]URLMemStore{},
+				UserUUIDSlugMemStore:  map[uuid.UUID]SlugMemStore{},
+				IsSlugDeletedMemStore: IsSlugDeletedMemStore{},
 			},
 			args: args{
 				slug: "abc12",
@@ -167,14 +173,17 @@ func TestMemory_Save(t *testing.T) {
 				URLMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
-				UUIDMemStore: map[uuid.UUID]string{},
+				UUIDMemStore:          map[uuid.UUID]string{},
+				UserUUIDURLMemStore:   map[uuid.UUID]URLMemStore{},
+				UserUUIDSlugMemStore:  map[uuid.UUID]SlugMemStore{},
+				IsSlugDeletedMemStore: IsSlugDeletedMemStore{},
 			},
 			args: args{
 				slug: "abc12",
 				url:  "https://example.com",
 			},
 			wantErr:     true,
-			wantErrName: service.ErrURLExist,
+			wantErrName: myerrors.ErrURLExist,
 		},
 		{
 			name: "Empty slug and existent URL",
@@ -185,14 +194,17 @@ func TestMemory_Save(t *testing.T) {
 				URLMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
-				UUIDMemStore: map[uuid.UUID]string{},
+				UUIDMemStore:          map[uuid.UUID]string{},
+				UserUUIDURLMemStore:   map[uuid.UUID]URLMemStore{},
+				UserUUIDSlugMemStore:  map[uuid.UUID]SlugMemStore{},
+				IsSlugDeletedMemStore: IsSlugDeletedMemStore{},
 			},
 			args: args{
 				slug: "",
 				url:  "https://example.com",
 			},
 			wantErr:     true,
-			wantErrName: service.ErrEmptyShortURLorURL,
+			wantErrName: myerrors.ErrEmptyShortURLorURL,
 		},
 		{
 			name: "Valid slug and empty URL",
@@ -203,25 +215,31 @@ func TestMemory_Save(t *testing.T) {
 				URLMemStore: URLMemStore{
 					"https://example.com": "abc123",
 				},
-				UUIDMemStore: map[uuid.UUID]string{},
+				UUIDMemStore:          map[uuid.UUID]string{},
+				UserUUIDURLMemStore:   map[uuid.UUID]URLMemStore{},
+				UserUUIDSlugMemStore:  map[uuid.UUID]SlugMemStore{},
+				IsSlugDeletedMemStore: IsSlugDeletedMemStore{},
 			},
 			args: args{
 				slug: "abc",
 				url:  "",
 			},
 			wantErr:     true,
-			wantErrName: service.ErrEmptyShortURLorURL,
+			wantErrName: myerrors.ErrEmptyShortURLorURL,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &MemStorage{
-				SlugMemStore: tt.fields.SlugMemStore,
-				URLMemStore:  tt.fields.URLMemStore,
-				UUIDMemStore: tt.fields.UUIDMemStore,
+				SlugMemStore:          tt.fields.SlugMemStore,
+				URLMemStore:           tt.fields.URLMemStore,
+				UUIDMemStore:          tt.fields.UUIDMemStore,
+				UserUUIDSlugMemStore:  tt.fields.UserUUIDSlugMemStore,
+				UserUUIDURLMemStore:   tt.fields.UserUUIDURLMemStore,
+				IsSlugDeletedMemStore: tt.fields.IsSlugDeletedMemStore,
 			}
 
-			if err := repo.Save(context.Background(), tt.args.slug, tt.args.url); (err != nil) != tt.wantErr || !errors.Is(err, tt.wantErrName) {
+			if err := repo.Save(context.Background(), uuid.Nil, tt.args.slug, tt.args.url); (err != nil) != tt.wantErr || !errors.Is(err, tt.wantErrName) {
 				fmt.Println(err, tt.wantErrName)
 				t.Errorf("Save() error = %s, wantErr %s", err, tt.wantErrName)
 			}

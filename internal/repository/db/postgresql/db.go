@@ -8,8 +8,9 @@ import (
 	"time"
 
 	"github.com/ar4ie13/shortener/internal/model"
+	"github.com/ar4ie13/shortener/internal/myerrors"
 	"github.com/ar4ie13/shortener/internal/repository/db/postgresql/config"
-	"github.com/ar4ie13/shortener/internal/service"
+	"github.com/google/uuid"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -52,7 +53,7 @@ func initPool(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
-// Close closed pgx pool
+// Close closes pgx pool
 func (db *DB) Close() error {
 	db.pool.Close()
 	return nil
@@ -75,7 +76,7 @@ func (db *DB) GetShortURL(ctx context.Context, originalURL string) (shortURL str
 	if err != nil {
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
-			return "", service.ErrNotFound
+			return "", myerrors.ErrNotFound
 		default:
 			return "", fmt.Errorf("failed to scan a response row: %w", err)
 		}
@@ -86,8 +87,8 @@ func (db *DB) GetShortURL(ctx context.Context, originalURL string) (shortURL str
 
 // GetURL gets URL by provided shortURL
 func (db *DB) GetURL(ctx context.Context, shortURL string) (originalURL string, err error) {
-
-	const queryStmt = `SELECT original_url FROM urls WHERE short_url = $1`
+	var isDeleted bool
+	const queryStmt = `SELECT original_url, is_deleted FROM urls WHERE short_url = $1`
 
 	start := time.Now()
 	defer func() {
@@ -97,30 +98,31 @@ func (db *DB) GetURL(ctx context.Context, shortURL string) (originalURL string, 
 
 	row := db.pool.QueryRow(ctx, queryStmt, shortURL)
 
-	err = row.Scan(&originalURL)
+	err = row.Scan(&originalURL, &isDeleted)
 	if err != nil {
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
-			return "", service.ErrNotFound
+			return "", myerrors.ErrNotFound
 		default:
 			return "", fmt.Errorf("failed to scan a response row: %w", err)
 		}
+	}
+	if isDeleted {
+		return "", myerrors.ErrShortURLIsDeleted
 	}
 
 	return originalURL, nil
 }
 
 // Save saves tuple with shortURL, URL and UUID
-func (db *DB) Save(ctx context.Context, shortURL string, originalURL string) error {
+func (db *DB) Save(ctx context.Context, userUUID uuid.UUID, shortURL string, originalURL string) error {
 
 	if shortURL == "" || originalURL == "" {
-		return service.ErrEmptyShortURLorURL
+		return myerrors.ErrEmptyShortURLorURL
 	}
 
 	const (
-		queryStmtInsert        = `INSERT INTO urls(short_url, original_url) VALUES ($1, $2)`
-		queryStmtCheckShortURL = `SELECT short_url FROM urls WHERE short_url = $1 LIMIT 1`
-		queryStmtCheckURL      = `SELECT original_url FROM urls WHERE original_url = $1 LIMIT 1`
+		queryStmtInsert = `INSERT INTO urls(short_url, original_url, user_uuid) VALUES ($1, $2, $3)`
 	)
 
 	start := time.Now()
@@ -129,15 +131,15 @@ func (db *DB) Save(ctx context.Context, shortURL string, originalURL string) err
 		db.zlog.Debug().Msgf("request execution duration: %s", elapsed)
 	}()
 
-	_, err := db.pool.Exec(ctx, queryStmtInsert, shortURL, originalURL)
+	_, err := db.pool.Exec(ctx, queryStmtInsert, shortURL, originalURL, userUUID)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
 			switch {
 			case strings.Contains(err.Error(), "urls_original_url_key"):
-				return fmt.Errorf("error while saving URL %s: %w", originalURL, service.ErrURLExist)
+				return fmt.Errorf("error while saving URL %s: %w", originalURL, myerrors.ErrURLExist)
 			case strings.Contains(err.Error(), "urls_short_url_key"):
-				return fmt.Errorf("error while saving URL %s: %w", shortURL, service.ErrShortURLExist)
+				return fmt.Errorf("error while saving URL %s: %w", shortURL, myerrors.ErrShortURLExist)
 			}
 		}
 		return fmt.Errorf("failed to save URL: %w", err)
@@ -149,8 +151,8 @@ func (db *DB) Save(ctx context.Context, shortURL string, originalURL string) err
 }
 
 // SaveBatch performs bulk insert to postgres database
-func (db *DB) SaveBatch(ctx context.Context, batch []model.URL) error {
-	query := `INSERT INTO urls (uuid, short_url, original_url) VALUES (@uuid, @shortURL, @originalURL)`
+func (db *DB) SaveBatch(ctx context.Context, userUUID uuid.UUID, batch []model.URL) error {
+	query := `INSERT INTO urls (uuid, short_url, original_url, user_uuid) VALUES (@uuid, @shortURL, @originalURL, @userUUID)`
 
 	insertBatch := &pgx.Batch{}
 	for _, v := range batch {
@@ -158,6 +160,7 @@ func (db *DB) SaveBatch(ctx context.Context, batch []model.URL) error {
 			"uuid":        v.UUID,
 			"shortURL":    v.ShortURL,
 			"originalURL": v.OriginalURL,
+			"userUUID":    userUUID,
 		}
 		insertBatch.Queue(query, args)
 	}
@@ -171,10 +174,86 @@ func (db *DB) SaveBatch(ctx context.Context, batch []model.URL) error {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
 				return fmt.Errorf("error while saving URL %s: %w", v.OriginalURL, err)
-
 			}
-
 			return fmt.Errorf("unable to insert row: %w", err)
+		}
+	}
+
+	return results.Close()
+}
+
+// GetUserShortURLs get slugs from db for the provider userUUID
+func (db *DB) GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[string]string, error) {
+	const queryStmt = `SELECT short_url, original_url FROM urls WHERE user_uuid = $1 and is_deleted = false`
+
+	start := time.Now()
+	defer func() {
+		elapsed := time.Since(start)
+		db.zlog.Debug().Msgf("request execution duration: %s", elapsed)
+	}()
+
+	rows, err := db.pool.Query(ctx, queryStmt, userUUID)
+	if err != nil {
+		return nil, err
+	}
+
+	//if !rows.Next() {
+	//	return nil, service.ErrNotFound
+	//}
+
+	userShortURLs := make(map[string]string)
+	for rows.Next() {
+		var shortURL string
+		var originalURL string
+
+		err = rows.Scan(&shortURL, &originalURL)
+		if err != nil {
+			return nil, err
+		}
+		userShortURLs[shortURL] = originalURL
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(userShortURLs) == 0 {
+		return nil, myerrors.ErrNotFound
+	}
+
+	return userShortURLs, nil
+}
+
+// DeleteUserShortURLs prepares batch for update IsDeleted field in db from false to true if exists
+func (db *DB) DeleteUserShortURLs(ctx context.Context, shortURLsToDelete map[uuid.UUID][]string) error {
+
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	if len(shortURLsToDelete) == 0 {
+		return nil
+	}
+
+	query := `UPDATE urls SET is_deleted = true WHERE short_url = @shortURL AND user_uuid = @userUUID`
+	insertBatch := &pgx.Batch{}
+	for k, v := range shortURLsToDelete {
+		for i := range v {
+			args := pgx.NamedArgs{
+				"userUUID": k,
+				"shortURL": v[i],
+			}
+			insertBatch.Queue(query, args)
+		}
+	}
+
+	results := db.pool.SendBatch(ctx, insertBatch)
+	defer results.Close()
+
+	for range shortURLsToDelete {
+		_, err := results.Exec()
+		if err != nil {
+			return fmt.Errorf("unable to update row: %w", err)
 		}
 	}
 
