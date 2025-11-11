@@ -228,6 +228,13 @@ func (db *DB) GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[str
 // DeleteUserShortURLs prepares batch for update IsDeleted field in db from false to true if exists
 func (db *DB) DeleteUserShortURLs(ctx context.Context, shortURLsToDelete map[uuid.UUID][]string) error {
 
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	if len(shortURLsToDelete) == 0 {
+		return nil
+	}
+
 	query := `UPDATE urls SET is_deleted = true WHERE short_url = @shortURL AND user_uuid = @userUUID`
 	insertBatch := &pgx.Batch{}
 	for k, v := range shortURLsToDelete {
