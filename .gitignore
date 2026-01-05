@@ -31,3 +31,4 @@ Makefile
 # json.l filestorage files
 storage.jsonl
 internal/repository/filestorage/test.jsonl
+audit.jsonl

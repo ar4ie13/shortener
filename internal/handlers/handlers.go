@@ -42,6 +42,10 @@ type Auth interface {
 	ValidateUserUUID(tokenString string) (uuid.UUID, error)
 }
 
+type Auditor interface {
+	Notify(action string, userUUID uuid.UUID, url string)
+}
+
 // Config interface gets configuration flags from config package
 type Config interface {
 	GetLocalServerAddr() string
@@ -52,15 +56,16 @@ type Config interface {
 
 // Handler is a main object for package handlers
 type Handler struct {
-	service Service
-	cfg     Config
-	auth    Auth
-	zlog    zerolog.Logger
+	service  Service
+	cfg      Config
+	auth     Auth
+	observer Auditor
+	zlog     zerolog.Logger
 }
 
 // NewHandler constructs Handler object
-func NewHandler(s Service, c Config, a Auth, zlog zerolog.Logger) *Handler {
-	return &Handler{s, c, a, zlog}
+func NewHandler(s Service, c Config, a Auth, o Auditor, zlog zerolog.Logger) *Handler {
+	return &Handler{s, c, a, o, zlog}
 }
 
 // ListenAndServe starts web server with specified chi router
@@ -160,6 +165,8 @@ func (h Handler) postURL(w http.ResponseWriter, r *http.Request) {
 	if _, err = w.Write([]byte(host)); err != nil {
 		h.zlog.Error().Msgf("Failed to write response: %v", err)
 	}
+
+	h.observer.Notify("shorten", userUUID, string(body))
 }
 
 func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
@@ -229,6 +236,8 @@ func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	h.observer.Notify("shorten", userUUID, req.LongURL)
 }
 
 // getURL handles get requests and redirects to the URL by provided shortURL if it is found in Repository
@@ -248,6 +257,8 @@ func (h Handler) getURL(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Location", url)
 	w.WriteHeader(http.StatusTemporaryRedirect)
+
+	h.observer.Notify("follow", userUUID, url)
 }
 
 // checkPostgresConnection used in /ping GET request

@@ -1,6 +1,8 @@
 package handlers
 
-import "github.com/google/uuid"
+import (
+	"github.com/google/uuid"
+)
 
 type LongURLReq struct {
 	LongURL string `json:"url"`

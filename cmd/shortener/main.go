@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/ar4ie13/shortener/internal/auditor"
 	"github.com/ar4ie13/shortener/internal/auth"
 	"github.com/ar4ie13/shortener/internal/config"
 	"github.com/ar4ie13/shortener/internal/handlers"
@@ -28,7 +29,8 @@ func run() error {
 		return fmt.Errorf("cannot initialize repository: %w", err)
 	}
 	srv := service.NewService(repo, zlog.Logger)
-	hdlr := handlers.NewHandler(srv, cfg, authorize, zlog.Logger)
+	auditor := auditor.NewAuditor(cfg.AuditConf, zlog.Logger)
+	hdlr := handlers.NewHandler(srv, cfg, authorize, auditor, zlog.Logger)
 
 	if err = hdlr.ListenAndServe(); err != nil {
 		return fmt.Errorf("shortener service error: %w", err)

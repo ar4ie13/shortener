@@ -197,10 +197,6 @@ func (db *DB) GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[str
 		return nil, err
 	}
 
-	//if !rows.Next() {
-	//	return nil, service.ErrNotFound
-	//}
-
 	userShortURLs := make(map[string]string)
 	for rows.Next() {
 		var shortURL string
@@ -235,7 +231,7 @@ func (db *DB) DeleteUserShortURLs(ctx context.Context, shortURLsToDelete map[uui
 		return nil
 	}
 
-	query := `UPDATE urls SET is_deleted = true WHERE short_url = @shortURL AND user_uuid = @userUUID`
+	const query = `UPDATE urls SET is_deleted = true WHERE short_url = @shortURL AND user_uuid = @userUUID`
 	insertBatch := &pgx.Batch{}
 	for k, v := range shortURLsToDelete {
 		for i := range v {
