@@ -10,15 +10,19 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// Observer is an observer interfae
 type Observer interface {
 	Update(action string, userUUID uuid.UUID, url string) error
 }
+
+// Auditor implements Observer interface
 type Auditor struct {
 	cfg       config.AuditConf
 	observers []Observer
 	zlog      zerolog.Logger
 }
 
+// NewAuditor creates new Auditor instance
 func NewAuditor(cfg config.AuditConf, zlog zerolog.Logger) *Auditor {
 	auditor := &Auditor{
 		cfg:  cfg,
@@ -40,12 +44,12 @@ func NewAuditor(cfg config.AuditConf, zlog zerolog.Logger) *Auditor {
 	return auditor
 }
 
-// Attach добавляет наблюдателя
+// Attach adds new observer
 func (s *Auditor) Attach(o Observer) {
 	s.observers = append(s.observers, o)
 }
 
-// Notify оповещает всех наблюдателей
+// Notify sends notification to all observers when the event occurs
 func (s *Auditor) Notify(action string, userUUID uuid.UUID, url string) {
 	for _, observer := range s.observers {
 		err := observer.Update(action, userUUID, url)

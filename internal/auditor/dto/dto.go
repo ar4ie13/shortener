@@ -4,6 +4,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// AuditRequest is a dto for audit entries
 type AuditRequest struct {
 	TS     int64     `json:"ts"`
 	Action string    `json:"action"`

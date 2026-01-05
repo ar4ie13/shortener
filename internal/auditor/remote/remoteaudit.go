@@ -13,11 +13,13 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// AuditRemoteLogger implements observer interface for file audit logging
 type AuditRemoteLogger struct {
 	cfg  config.RemoteAuditConfig
 	zlog zerolog.Logger
 }
 
+// NewAuditRemoteLogger create new Remote Audit instance
 func NewAuditRemoteLogger(conf config.RemoteAuditConfig, zlog zerolog.Logger) *AuditRemoteLogger {
 	return &AuditRemoteLogger{
 		cfg:  conf,
@@ -25,6 +27,7 @@ func NewAuditRemoteLogger(conf config.RemoteAuditConfig, zlog zerolog.Logger) *A
 	}
 }
 
+// Update writes jsonl audit string to audit file
 func (a *AuditRemoteLogger) Update(action string, userUUID uuid.UUID, url string) error {
 	entry := dto.AuditRequest{
 		TS:     time.Now().Unix(),

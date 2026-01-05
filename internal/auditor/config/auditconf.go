@@ -5,6 +5,7 @@ import (
 	remoteconf "github.com/ar4ie13/shortener/internal/auditor/remote/config"
 )
 
+// AuditConf contains configuration for both file and remote host audits
 type AuditConf struct {
 	FileConf   fileconf.FileAuditConfig
 	RemoteConf remoteconf.RemoteAuditConfig
