@@ -177,7 +177,7 @@ func TestFileStorage_Store(t *testing.T) {
 				},
 				urlMapping: model.URL{
 					UUID: uuid.UUID{},
-					
+
 					ShortURL:    "",
 					OriginalURL: "",
 				},
