@@ -274,3 +274,23 @@ func TestService_GetURL_Mockery(t *testing.T) {
 		})
 	}
 }
+
+func Benchmark_Service_generateShortURL(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		generateShortURL(8)
+	}
+}
+
+func Benchmark_Service_SaveURL(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+
+		srv := Service{repo: &HandyMockRepository{urls: map[string]string{}}}
+		ctx := context.Background()
+		userUUID, _ := uuid.NewUUID()
+		url := func() string {
+			body, _ := generateShortURL(8)
+			return "http://" + body + ".com"
+		}()
+		srv.SaveURL(ctx, userUUID, url)
+	}
+}

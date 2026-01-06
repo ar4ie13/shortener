@@ -29,8 +29,8 @@ func run() error {
 		return fmt.Errorf("cannot initialize repository: %w", err)
 	}
 	srv := service.NewService(repo, zlog.Logger)
-	auditor := auditor.NewAuditor(cfg.AuditConf, zlog.Logger)
-	hdlr := handlers.NewHandler(srv, cfg, authorize, auditor, zlog.Logger)
+	audit := auditor.NewAuditor(cfg.AuditConf, zlog.Logger)
+	hdlr := handlers.NewHandler(srv, cfg, authorize, audit, zlog.Logger)
 
 	if err = hdlr.ListenAndServe(); err != nil {
 		return fmt.Errorf("shortener service error: %w", err)

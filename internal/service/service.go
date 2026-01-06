@@ -17,10 +17,12 @@ import (
 )
 
 const (
-	randGenerateSymbols  = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	shortURLLen          = 8
-	timeToCollectDeleted = 2 * time.Second
+	randGenerateSymbolsOld = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	shortURLLen            = 8
+	timeToCollectDeleted   = 2 * time.Second
 )
+
+var randGenerateSymbols = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 // Repository interface used to interact with repository package to store or retrieve values
 type Repository interface {

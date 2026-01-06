@@ -34,12 +34,12 @@ func NewAuditor(cfg config.AuditConf, zlog zerolog.Logger) *Auditor {
 			log.Fatal(err)
 		}
 		auditor.Attach(fileAudit)
-		zlog.Debug().Msgf("Writing to audit file: %s", auditor.cfg.FileConf.AuditFilePath)
+		zlog.Info().Msgf("Writing to audit file: %s", auditor.cfg.FileConf.AuditFilePath)
 	}
 	if auditor.cfg.RemoteConf.RemoteServerURL != "" {
 		remoteAudit := remote.NewAuditRemoteLogger(auditor.cfg.RemoteConf, auditor.zlog)
 		auditor.Attach(remoteAudit)
-		zlog.Debug().Msgf("Writing to audit host: %s", auditor.cfg.RemoteConf.RemoteServerURL)
+		zlog.Info().Msgf("Writing to audit host: %s", auditor.cfg.RemoteConf.RemoteServerURL)
 	}
 	return auditor
 }
