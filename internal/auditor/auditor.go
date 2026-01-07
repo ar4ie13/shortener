@@ -1,3 +1,5 @@
+// Package auditor is used to perform audit to file or/and remote server depending on specified
+// flags or environment variables.
 package auditor
 
 import (

@@ -1,3 +1,4 @@
+// Package handlers contains API and middleware used by web server.
 package handlers
 
 import (
@@ -88,14 +89,14 @@ func (h Handler) ListenAndServe() error {
 		router.Use(h.gzipMiddleware)
 
 		router.Route("/", func(router chi.Router) {
-			router.Post("/", h.postURL)
-			router.Get("/{id}", h.getURL)
-			router.Get("/ping", h.checkPostgresConnection)
+			router.Post("/", h.PostURL)
+			router.Get("/{id}", h.GetURL)
+			router.Get("/ping", h.CheckPostgresConnection)
 			router.Route("/api", func(router chi.Router) {
-				router.Post("/shorten", h.postURLJSON)
-				router.Post("/shorten/batch", h.postURLJSONBatch)
-				router.Get("/user/urls", h.getUsersShortURL)
-				router.Delete("/user/urls", h.deleteUsersShortURL)
+				router.Post("/shorten", h.PostURLJSON)
+				router.Post("/shorten/batch", h.PostURLJSONBatch)
+				router.Get("/user/urls", h.GetUsersShortURL)
+				router.Delete("/user/urls", h.DeleteUsersShortURL)
 			})
 		})
 	})
@@ -111,7 +112,7 @@ func (h Handler) ListenAndServe() error {
 
 // getUserUID
 func (h Handler) getUserUUIDFromRequest(r *http.Request) (uuid.UUID, error) {
-	userUUID, err := uuid.Parse(r.Context().Value(userUUIDKey).(string))
+	userUUID, err := uuid.Parse(r.Context().Value(UserUUIDKey).(string))
 	if err != nil {
 		h.zlog.Debug().Msgf("cannot parse user UUID: %v", err)
 		return uuid.Nil, err
@@ -137,8 +138,8 @@ func (h Handler) getStatusCode(err error) int {
 	return http.StatusInternalServerError
 }
 
-// postURL handles POST requests from clients and receives URL from body to store it in the Repository via Service
-func (h Handler) postURL(w http.ResponseWriter, r *http.Request) {
+// PostURL handles POST requests from clients and receives URL from body to store it in the Repository via Service
+func (h Handler) PostURL(w http.ResponseWriter, r *http.Request) {
 	userUUID, err := h.getUserUUIDFromRequest(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -181,7 +182,7 @@ func (h Handler) postURL(w http.ResponseWriter, r *http.Request) {
 	h.observer.Notify("shorten", userUUID, string(body))
 }
 
-func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
+func (h Handler) PostURLJSON(w http.ResponseWriter, r *http.Request) {
 	userUUID, err := h.getUserUUIDFromRequest(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -252,8 +253,8 @@ func (h Handler) postURLJSON(w http.ResponseWriter, r *http.Request) {
 	h.observer.Notify("shorten", userUUID, req.LongURL)
 }
 
-// getURL handles get requests and redirects to the URL by provided shortURL if it is found in Repository
-func (h Handler) getURL(w http.ResponseWriter, r *http.Request) {
+// GetURL handles get requests and redirects to the URL by provided shortURL if it is found in Repository
+func (h Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 	userUUID, err := h.getUserUUIDFromRequest(r)
 
 	if err != nil {
@@ -273,8 +274,8 @@ func (h Handler) getURL(w http.ResponseWriter, r *http.Request) {
 	h.observer.Notify("follow", userUUID, url)
 }
 
-// checkPostgresConnection used in /ping GET request
-func (h Handler) checkPostgresConnection(w http.ResponseWriter, r *http.Request) {
+// CheckPostgresConnection used in /ping GET request
+func (h Handler) CheckPostgresConnection(w http.ResponseWriter, r *http.Request) {
 	err := h.cfg.CheckPostgresConnection(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -283,8 +284,8 @@ func (h Handler) checkPostgresConnection(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusOK)
 }
 
-// postURLJSONBatch handles batch request in JSON
-func (h Handler) postURLJSONBatch(w http.ResponseWriter, r *http.Request) {
+// PostURLJSONBatch handles batch request in JSON
+func (h Handler) PostURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 	userUUID, err := h.getUserUUIDFromRequest(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -351,8 +352,8 @@ func (h Handler) postURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// getURL handles get requests and redirects to the URL by provided shortURL if it is found in Repository
-func (h Handler) getUsersShortURL(w http.ResponseWriter, r *http.Request) {
+// GetUsersShortURL handles get requests and redirects to the URL by provided shortURL if it is found in Repository
+func (h Handler) GetUsersShortURL(w http.ResponseWriter, r *http.Request) {
 	userUUID, err := h.getUserUUIDFromRequest(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -392,8 +393,8 @@ func (h Handler) getUsersShortURL(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// deleteUsersShortURL handles users short url deletion and places slugs into the channel in service
-func (h Handler) deleteUsersShortURL(w http.ResponseWriter, r *http.Request) {
+// DeleteUsersShortURL handles users short url deletion and places slugs into the channel in service
+func (h Handler) DeleteUsersShortURL(w http.ResponseWriter, r *http.Request) {
 	userUUID, err := h.getUserUUIDFromRequest(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

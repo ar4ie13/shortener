@@ -1,3 +1,4 @@
+// Package model contains main entities of the service
 package model
 
 import "github.com/google/uuid"

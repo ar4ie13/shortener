@@ -1,3 +1,4 @@
+// Workload is used to generate workload for service benchmarking and profiling
 package main
 
 import (

@@ -1,3 +1,4 @@
+// Package config reads flags and environment variables to initialize service config
 package config
 
 import (

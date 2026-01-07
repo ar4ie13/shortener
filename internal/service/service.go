@@ -1,3 +1,4 @@
+// Package service contains main business logic of the service
 package service
 
 import (
@@ -17,9 +18,8 @@ import (
 )
 
 const (
-	randGenerateSymbolsOld = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	shortURLLen            = 8
-	timeToCollectDeleted   = 2 * time.Second
+	shortURLLen          = 8               //number of symbols for slugs
+	timeToCollectDeleted = 2 * time.Second // delay between collecting slugs to be deleted from storage
 )
 
 var randGenerateSymbols = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")

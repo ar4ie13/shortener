@@ -1,3 +1,4 @@
+// This is a starting point for shortener service. It initializes configuration, objects and starts web server.
 package main
 
 import (
@@ -14,12 +15,14 @@ import (
 	"github.com/ar4ie13/shortener/internal/service"
 )
 
+// main starts run functions which contains all objects initialization
 func main() {
 	if err := run(); err != nil {
 		log.Fatal(err)
 	}
 }
 
+// run function is used to init configuration, create all objects and start web server
 func run() error {
 	cfg := config.NewConfig()
 	zlog := logger.NewLogger(cfg.GetLogLevel())
