@@ -591,7 +591,7 @@ func Benchmark_Service_generateShortURL(b *testing.B) {
 func Benchmark_Service_SaveURL(b *testing.B) {
 	for b.Loop() {
 
-		srv := Service{repo: &HandyMockRepository{urls: map[string]string{}}}
+		srv := Service{repo: &MockRepository{}}
 		ctx := context.Background()
 		userUUID, _ := uuid.NewUUID()
 		url := func() string {
