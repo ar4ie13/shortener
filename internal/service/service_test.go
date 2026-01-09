@@ -581,3 +581,23 @@ func TestService_DeleteFunctionality(t *testing.T) {
 	channel := service.toDeleteChan[0]
 	assert.NotNil(t, channel)
 }
+
+func Benchmark_Service_generateShortURL(b *testing.B) {
+	for b.Loop() {
+		generateShortURL(8)
+	}
+}
+
+func Benchmark_Service_SaveURL(b *testing.B) {
+	for b.Loop() {
+
+		srv := Service{repo: &HandyMockRepository{urls: map[string]string{}}}
+		ctx := context.Background()
+		userUUID, _ := uuid.NewUUID()
+		url := func() string {
+			body, _ := generateShortURL(8)
+			return "http://" + body + ".com"
+		}()
+		srv.SaveURL(ctx, userUUID, url)
+	}
+}
