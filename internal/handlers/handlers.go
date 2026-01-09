@@ -303,7 +303,7 @@ func (h Handler) PostURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 	h.zlog.Debug().Msg("decoding batch request")
 
 	var req []BatchRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.zlog.Debug().Err(err).Msg("failed to decode batch request JSON")
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -346,7 +346,7 @@ func (h Handler) PostURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	if err = json.NewEncoder(w).Encode(resp); err != nil {
 		h.zlog.Warn().Err(err).Msg("failed to encode batch response")
 		// Note: Can't send error to client after headers written
 	}

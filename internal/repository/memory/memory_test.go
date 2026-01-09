@@ -2,364 +2,228 @@ package memory
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"testing"
 
+	"github.com/ar4ie13/shortener/internal/model"
 	"github.com/ar4ie13/shortener/internal/myerrors"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestNewMemStorage(t *testing.T) {
-	tests := []struct {
-		name              string
-		expectedMapLength int
-	}{
-		{
-			name:              "NewMemStorage",
-			expectedMapLength: 0,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := NewMemStorage(); len(got.UserUUIDURLMemStore) != tt.expectedMapLength || len(got.SlugMemStore) != tt.expectedMapLength {
-				t.Errorf("NewMemStorage() urlLib lenth = %v, want %v", got, tt.expectedMapLength)
-			}
-			if got := NewMemStorage(); got.SlugMemStore == nil || got.UserUUIDURLMemStore == nil {
-				t.Errorf("NewMemStorage() SlugMemStore or UserUUIDURLMemStore is nil")
-			}
-			if got := NewMemStorage(); got == nil {
-				t.Errorf("NewMemStorage() struct is nil")
-			}
-		})
-	}
+func TestMemStorage_GetURL(t *testing.T) {
+	repo := NewMemStorage()
+	ctx := context.Background()
+
+	shortURL := "abc123"
+	originalURL := "https://example.com"
+
+	// Save first
+	userUUID := uuid.New()
+	err := repo.Save(ctx, userUUID, shortURL, originalURL)
+	require.NoError(t, err)
+
+	// Retrieve
+	got, err := repo.GetURL(ctx, shortURL)
+	assert.NoError(t, err)
+	assert.Equal(t, originalURL, got)
+
+	// Non-existent slug
+	_, err = repo.GetURL(ctx, "nonexistent")
+	assert.ErrorIs(t, err, myerrors.ErrNotFound)
+
+	// Deleted slug
+	repo.IsSlugDeletedMemStore[shortURL] = true
+	_, err = repo.GetURL(ctx, shortURL)
+	assert.ErrorIs(t, err, myerrors.ErrShortURLIsDeleted)
 }
 
-func TestMemory_Get(t *testing.T) {
-	type fields struct {
-		slugMemStore map[string]string
-		urlMemStore  map[string]string
-	}
-	type args struct {
-		slug string
-	}
-	tests := []struct {
-		name      string
-		fields    fields
-		args      args
-		want      string
-		wantErr   bool
-		wantError error
-	}{
-		{
-			name: "Valid slug",
-			fields: fields{
-				slugMemStore: SlugMemStore{
-					"abc123": "https://example.com",
-				},
-				urlMemStore: URLMemStore{
-					"https://example.com": "abc123",
-				},
-			},
-			args: args{
-				slug: "abc123",
-			},
-			want:      "https://example.com",
-			wantErr:   false,
-			wantError: nil,
-		},
-		{
-			name: "Non-existent slug",
-			fields: fields{
-				slugMemStore: SlugMemStore{
-					"abc12": "https://example.com",
-				},
-				urlMemStore: URLMemStore{
-					"https://example.com": "abc12",
-				},
-			},
-			args: args{
-				slug: "abc123",
-			},
-			want:      "",
-			wantErr:   true,
-			wantError: myerrors.ErrNotFound,
-		},
-		{
-			name: "Empty input parameter",
-			fields: fields{
-				slugMemStore: SlugMemStore{
-					"abc12": "https://example.com",
-				},
-				urlMemStore: URLMemStore{
-					"https://example.com": "abc12",
-				},
-			},
-			args: args{
-				slug: "",
-			},
-			want:      "",
-			wantErr:   true,
-			wantError: myerrors.ErrNotFound,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repo := &MemStorage{
-				SlugMemStore: tt.fields.slugMemStore,
-				URLMemStore:  tt.fields.urlMemStore,
-			}
-			got, err := repo.GetURL(context.Background(), tt.args.slug)
-			if got != tt.want {
-				t.Errorf("GetURL() got = %v, want %v", got, tt.want)
-			}
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetURL() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+func TestMemStorage_GetShortURL(t *testing.T) {
+	repo := NewMemStorage()
+	ctx := context.Background()
 
-		})
-	}
+	shortURL := "xyz789"
+	originalURL := "https://example.org"
+
+	userUUID := uuid.New()
+	err := repo.Save(ctx, userUUID, shortURL, originalURL)
+	require.NoError(t, err)
+
+	// Retrieve
+	got, err := repo.GetShortURL(ctx, originalURL)
+	assert.NoError(t, err)
+	assert.Equal(t, shortURL, got)
+
+	// Non-existent URL
+	_, err = repo.GetShortURL(ctx, "https://notfound.com")
+	assert.ErrorIs(t, err, myerrors.ErrNotFound)
+
+	// Deleted slug
+	repo.IsSlugDeletedMemStore[shortURL] = true
+	_, err = repo.GetShortURL(ctx, originalURL)
+	assert.ErrorIs(t, err, myerrors.ErrNotFound)
 }
 
-func TestMemory_Save(t *testing.T) {
+func TestMemStorage_Save(t *testing.T) {
+	repo := NewMemStorage()
+	ctx := context.Background()
+	userUUID := uuid.New()
 
-	type fields struct {
-		SlugMemStore          map[string]string
-		URLMemStore           map[string]string
-		UUIDMemStore          map[uuid.UUID]string
-		UserUUIDURLMemStore   map[uuid.UUID]URLMemStore
-		UserUUIDSlugMemStore  map[uuid.UUID]SlugMemStore
-		IsSlugDeletedMemStore IsSlugDeletedMemStore
-	}
-	type args struct {
-		slug string
-		url  string
-	}
-	tests := []struct {
-		name        string
-		fields      fields
-		args        args
-		wantErr     bool
-		wantErrName error
-	}{
-		{
-			name: "Valid slug and URL",
-			fields: fields{
-				SlugMemStore: SlugMemStore{
-					"abc123": "https://example.com",
-				},
-				URLMemStore: URLMemStore{
-					"https://example.com": "abc123",
-				},
-				UUIDMemStore:          map[uuid.UUID]string{},
-				UserUUIDURLMemStore:   map[uuid.UUID]URLMemStore{},
-				UserUUIDSlugMemStore:  map[uuid.UUID]SlugMemStore{},
-				IsSlugDeletedMemStore: IsSlugDeletedMemStore{},
-			},
-			args: args{
-				slug: "abc12",
-				url:  "https://examplenew.com",
-			},
-			wantErr:     false,
-			wantErrName: nil,
-		},
-		{
-			name: "Valid slug and existent URL",
-			fields: fields{
-				SlugMemStore: SlugMemStore{
-					"abc123": "https://example.com",
-				},
-				URLMemStore: URLMemStore{
-					"https://example.com": "abc123",
-				},
-				UUIDMemStore:          map[uuid.UUID]string{},
-				UserUUIDURLMemStore:   map[uuid.UUID]URLMemStore{},
-				UserUUIDSlugMemStore:  map[uuid.UUID]SlugMemStore{},
-				IsSlugDeletedMemStore: IsSlugDeletedMemStore{},
-			},
-			args: args{
-				slug: "abc12",
-				url:  "https://example.com",
-			},
-			wantErr:     true,
-			wantErrName: myerrors.ErrURLExist,
-		},
-		{
-			name: "Empty slug and existent URL",
-			fields: fields{
-				SlugMemStore: SlugMemStore{
-					"abc123": "https://example.com",
-				},
-				URLMemStore: URLMemStore{
-					"https://example.com": "abc123",
-				},
-				UUIDMemStore:          map[uuid.UUID]string{},
-				UserUUIDURLMemStore:   map[uuid.UUID]URLMemStore{},
-				UserUUIDSlugMemStore:  map[uuid.UUID]SlugMemStore{},
-				IsSlugDeletedMemStore: IsSlugDeletedMemStore{},
-			},
-			args: args{
-				slug: "",
-				url:  "https://example.com",
-			},
-			wantErr:     true,
-			wantErrName: myerrors.ErrEmptyShortURLorURL,
-		},
-		{
-			name: "Valid slug and empty URL",
-			fields: fields{
-				SlugMemStore: SlugMemStore{
-					"abc123": "https://example.com",
-				},
-				URLMemStore: URLMemStore{
-					"https://example.com": "abc123",
-				},
-				UUIDMemStore:          map[uuid.UUID]string{},
-				UserUUIDURLMemStore:   map[uuid.UUID]URLMemStore{},
-				UserUUIDSlugMemStore:  map[uuid.UUID]SlugMemStore{},
-				IsSlugDeletedMemStore: IsSlugDeletedMemStore{},
-			},
-			args: args{
-				slug: "abc",
-				url:  "",
-			},
-			wantErr:     true,
-			wantErrName: myerrors.ErrEmptyShortURLorURL,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repo := &MemStorage{
-				SlugMemStore:          tt.fields.SlugMemStore,
-				URLMemStore:           tt.fields.URLMemStore,
-				UUIDMemStore:          tt.fields.UUIDMemStore,
-				UserUUIDSlugMemStore:  tt.fields.UserUUIDSlugMemStore,
-				UserUUIDURLMemStore:   tt.fields.UserUUIDURLMemStore,
-				IsSlugDeletedMemStore: tt.fields.IsSlugDeletedMemStore,
-			}
+	t.Run("Success", func(t *testing.T) {
+		err := repo.Save(ctx, userUUID, "test1", "https://valid.com")
+		assert.NoError(t, err)
+	})
 
-			if err := repo.Save(context.Background(), uuid.Nil, tt.args.slug, tt.args.url); (err != nil) != tt.wantErr || !errors.Is(err, tt.wantErrName) {
-				fmt.Println(err, tt.wantErrName)
-				t.Errorf("Save() error = %s, wantErr %s", err, tt.wantErrName)
-			}
-		})
-	}
+	t.Run("Empty shortURL or URL", func(t *testing.T) {
+		err := repo.Save(ctx, userUUID, "", "https://valid.com")
+		assert.ErrorIs(t, err, myerrors.ErrEmptyShortURLorURL)
+
+		err = repo.Save(ctx, userUUID, "test2", "")
+		assert.ErrorIs(t, err, myerrors.ErrEmptyShortURLorURL)
+	})
+
+	t.Run("Duplicate URL", func(t *testing.T) {
+		err := repo.Save(ctx, userUUID, "test3", "https://duplicate.com")
+		require.NoError(t, err)
+
+		err = repo.Save(ctx, userUUID, "test4", "https://duplicate.com")
+		assert.ErrorIs(t, err, myerrors.ErrURLExist)
+	})
+
+	t.Run("Duplicate ShortURL", func(t *testing.T) {
+		err := repo.Save(ctx, userUUID, "conflict", "https://first.com")
+		require.NoError(t, err)
+
+		err = repo.Save(ctx, userUUID, "conflict", "https://second.com")
+		assert.ErrorIs(t, err, myerrors.ErrShortURLExist)
+	})
 }
 
-func TestMemory_existsURL(t *testing.T) {
-	type fields struct {
-		SlugMemStore map[string]string
-		URLMemStore  map[string]string
-		UUIDMemStore map[string]string
+func TestMemStorage_SaveBatch(t *testing.T) {
+	repo := NewMemStorage()
+	ctx := context.Background()
+	userUUID := uuid.New()
+
+	batch := []model.URL{
+		{UUID: uuid.New(), ShortURL: "b1", OriginalURL: "https://b1.com"},
+		{UUID: uuid.New(), ShortURL: "b2", OriginalURL: "https://b2.com"},
 	}
-	type args struct {
-		url string
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   bool
-	}{
-		{
-			name: "Exists URL",
-			fields: fields{
-				SlugMemStore: SlugMemStore{
-					"abc123": "https://example.com",
-				},
-				URLMemStore: URLMemStore{
-					"https://example.com": "abc123",
-				},
-			},
-			args: args{
-				url: "https://example.com",
-			},
-			want: true,
-		},
-		{
-			name: "Not existsURL URL",
-			fields: fields{
-				SlugMemStore: SlugMemStore{
-					"abc123": "https://example.com",
-				},
-				URLMemStore: URLMemStore{
-					"https://example.com": "abc123",
-				},
-			},
-			args: args{
-				url: "https://examplenew.com",
-			},
-			want: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repo := &MemStorage{
-				SlugMemStore: tt.fields.SlugMemStore,
-				URLMemStore:  tt.fields.URLMemStore,
-			}
-			if got := repo.existsURL(tt.args.url); got != tt.want {
-				t.Errorf("existsURL() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+
+	t.Run("Success", func(t *testing.T) {
+		err := repo.SaveBatch(ctx, userUUID, batch)
+		assert.NoError(t, err)
+
+		// Verify mappings
+		for _, item := range batch {
+			url, ok := repo.SlugMemStore[item.ShortURL]
+			assert.True(t, ok)
+			assert.Equal(t, item.OriginalURL, url)
+
+			slug, ok := repo.URLMemStore[item.OriginalURL]
+			assert.True(t, ok)
+			assert.Equal(t, item.ShortURL, slug)
+
+			assert.Equal(t, item.OriginalURL, repo.UserUUIDSlugMemStore[userUUID][item.ShortURL])
+			assert.Equal(t, item.ShortURL, repo.UserUUIDURLMemStore[userUUID][item.OriginalURL])
+			assert.Equal(t, item.ShortURL, repo.UUIDMemStore[item.UUID])
+			assert.False(t, repo.IsSlugDeletedMemStore[item.ShortURL])
+		}
+	})
+
+	t.Run("Empty fields", func(t *testing.T) {
+		badBatch := []model.URL{{ShortURL: "", OriginalURL: "https://bad.com"}}
+		err := repo.SaveBatch(ctx, userUUID, badBatch)
+		assert.ErrorIs(t, err, myerrors.ErrEmptyShortURLorURL)
+	})
+
+	t.Run("Conflict with existing data", func(t *testing.T) {
+		// First save one URL
+		err := repo.Save(ctx, userUUID, "existing", "https://exists.com")
+		require.NoError(t, err)
+
+		// Try to batch-save same URL
+		conflictBatch := []model.URL{
+			{UUID: uuid.New(), ShortURL: "new", OriginalURL: "https://exists.com"},
+		}
+		err = repo.SaveBatch(ctx, userUUID, conflictBatch)
+		assert.ErrorIs(t, err, myerrors.ErrURLExist)
+	})
 }
 
-func TestMemory_existsShortURL(t *testing.T) {
-	type fields struct {
-		slugMemStore map[string]string
-		urlMemStore  map[string]string
-	}
-	type args struct {
-		slug string
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   bool
-	}{
-		{
-			name: "Exists URL",
-			fields: fields{
-				slugMemStore: SlugMemStore{
-					"abc123": "https://example.com",
-				},
-				urlMemStore: URLMemStore{
-					"https://example.com": "abc123",
-				},
-			},
-			args: args{
-				slug: "abc123",
-			},
-			want: true,
-		},
-		{
-			name: "Not existsURL URL",
-			fields: fields{
-				slugMemStore: SlugMemStore{
-					"abc123": "https://example.com",
-				},
-				urlMemStore: URLMemStore{
-					"https://example.com": "abc123",
-				},
-			},
-			args: args{
-				slug: "abc",
-			},
-			want: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repo := &MemStorage{
-				SlugMemStore: tt.fields.slugMemStore,
-				URLMemStore:  tt.fields.urlMemStore,
-			}
-			if got := repo.existsShortURL(tt.args.slug); got != tt.want {
-				t.Errorf("existsShortURL() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+func TestMemStorage_GetUserShortURLs(t *testing.T) {
+	repo := NewMemStorage()
+	ctx := context.Background()
+	user1 := uuid.New()
+	user2 := uuid.New()
+
+	// Add URLs for user1
+	repo.Save(ctx, user1, "u1s1", "https://u1-1.com")
+	repo.Save(ctx, user1, "u1s2", "https://u1-2.com")
+
+	// Add for user2
+	repo.Save(ctx, user2, "u2s1", "https://u2-1.com")
+
+	t.Run("Valid user", func(t *testing.T) {
+		result, err := repo.GetUserShortURLs(ctx, user1)
+		assert.NoError(t, err)
+		expected := map[string]string{
+			"u1s1": "https://u1-1.com",
+			"u1s2": "https://u1-2.com",
+		}
+		assert.Equal(t, expected, result)
+	})
+
+	t.Run("Non-existent user", func(t *testing.T) {
+		_, err := repo.GetUserShortURLs(ctx, uuid.New())
+		assert.ErrorIs(t, err, myerrors.ErrNotFound)
+	})
+
+	t.Run("Excludes deleted slugs", func(t *testing.T) {
+		repo.IsSlugDeletedMemStore["u1s1"] = true
+		result, err := repo.GetUserShortURLs(ctx, user1)
+		assert.NoError(t, err)
+		expected := map[string]string{
+			"u1s2": "https://u1-2.com",
+		}
+		assert.Equal(t, expected, result)
+	})
+}
+
+func TestMemStorage_DeleteUserShortURLs(t *testing.T) {
+	repo := NewMemStorage()
+	ctx := context.Background()
+	userUUID := uuid.New()
+
+	// Save some URLs
+	repo.Save(ctx, userUUID, "to-delete", "https://delete.me")
+	repo.Save(ctx, userUUID, "keep", "https://keep.me")
+
+	t.Run("Success deletion", func(t *testing.T) {
+		toDelete := map[uuid.UUID][]string{
+			userUUID: {"to-delete"},
+		}
+		err := repo.DeleteUserShortURLs(ctx, toDelete)
+		assert.NoError(t, err)
+		assert.True(t, repo.IsSlugDeletedMemStore["to-delete"])
+		assert.False(t, repo.IsSlugDeletedMemStore["keep"])
+	})
+
+	t.Run("Invalid user UUID", func(t *testing.T) {
+		toDelete := map[uuid.UUID][]string{
+			uuid.New(): {"any"},
+		}
+		err := repo.DeleteUserShortURLs(ctx, toDelete)
+		assert.ErrorIs(t, err, myerrors.ErrInvalidUserUUID)
+	})
+
+	t.Run("Non-existent slug in user's list", func(t *testing.T) {
+		// Should not panic or error; just skip
+		toDelete := map[uuid.UUID][]string{
+			userUUID: {"nonexistent-slug"},
+		}
+		err := repo.DeleteUserShortURLs(ctx, toDelete)
+		assert.NoError(t, err)
+		// Ensure no side effect
+		assert.False(t, repo.IsSlugDeletedMemStore["nonexistent-slug"]) // remains false or unset
+	})
 }

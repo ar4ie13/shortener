@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/ar4ie13/shortener/internal/auditor/dto"
@@ -15,6 +16,7 @@ import (
 // AuditFileLogger implements Observer interface
 type AuditFileLogger struct {
 	file *os.File
+	mu   sync.Mutex
 	zlog zerolog.Logger
 }
 
@@ -26,6 +28,7 @@ func NewAuditFileLogger(conf cfg.FileAuditConfig, zlog zerolog.Logger) (*AuditFi
 	}
 	return &AuditFileLogger{
 		file: file,
+		mu:   sync.Mutex{},
 		zlog: zlog,
 	}, nil
 }
@@ -43,10 +46,12 @@ func (a *AuditFileLogger) Update(action string, userUUID uuid.UUID, url string) 
 	if err != nil {
 		return fmt.Errorf("cannot marshal audit entry to json: %w", err)
 	}
-
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	_, err = a.file.Write(jsonLine)
 	if err != nil {
 		a.zlog.Error().Msgf("Audit log write error: %v", err)
+		return fmt.Errorf("cannot write to file: %w", err)
 	}
 	_, err = a.file.WriteString("\n")
 	if err != nil {

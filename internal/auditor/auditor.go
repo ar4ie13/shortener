@@ -19,6 +19,7 @@ type Observer interface {
 
 // Auditor implements Observer interface
 type Auditor struct {
+	enabled   bool
 	cfg       config.AuditConf
 	observers []Observer
 	zlog      zerolog.Logger
@@ -27,8 +28,9 @@ type Auditor struct {
 // NewAuditor creates new Auditor instance
 func NewAuditor(cfg config.AuditConf, zlog zerolog.Logger) *Auditor {
 	auditor := &Auditor{
-		cfg:  cfg,
-		zlog: zlog,
+		enabled: false,
+		cfg:     cfg,
+		zlog:    zlog,
 	}
 	if auditor.cfg.FileConf.AuditFilePath != "" {
 		fileAudit, err := file.NewAuditFileLogger(auditor.cfg.FileConf, auditor.zlog)
@@ -37,11 +39,13 @@ func NewAuditor(cfg config.AuditConf, zlog zerolog.Logger) *Auditor {
 		}
 		auditor.Attach(fileAudit)
 		zlog.Info().Msgf("Writing to audit file: %s", auditor.cfg.FileConf.AuditFilePath)
+		auditor.enabled = true
 	}
 	if auditor.cfg.RemoteConf.RemoteServerURL != "" {
 		remoteAudit := remote.NewAuditRemoteLogger(auditor.cfg.RemoteConf, auditor.zlog)
 		auditor.Attach(remoteAudit)
 		zlog.Info().Msgf("Writing to audit host: %s", auditor.cfg.RemoteConf.RemoteServerURL)
+		auditor.enabled = true
 	}
 	return auditor
 }
@@ -53,10 +57,12 @@ func (s *Auditor) Attach(o Observer) {
 
 // Notify sends notification to all observers when the event occurs
 func (s *Auditor) Notify(action string, userUUID uuid.UUID, url string) {
-	for _, observer := range s.observers {
-		err := observer.Update(action, userUUID, url)
-		if err != nil {
-			s.zlog.Error().Msgf("Error updating auditor observer: %v", err)
+	if s.enabled {
+		for _, observer := range s.observers {
+			err := observer.Update(action, userUUID, url)
+			if err != nil {
+				s.zlog.Error().Msgf("Error updating auditor observer: %v", err)
+			}
 		}
 	}
 }
