@@ -591,13 +591,15 @@ func Benchmark_Service_generateShortURL(b *testing.B) {
 func Benchmark_Service_SaveURL(b *testing.B) {
 	for b.Loop() {
 
-		srv := Service{repo: &MockRepository{}}
+		repo := &MockRepository{}
+		srv := Service{repo: repo}
 		ctx := context.Background()
 		userUUID, _ := uuid.NewUUID()
 		url := func() string {
 			body, _ := generateShortURL(8)
 			return "http://" + body + ".com"
 		}()
+		repo.On("Save", ctx, userUUID, mock.AnythingOfType("string"), url).Return(nil)
 		srv.SaveURL(ctx, userUUID, url)
 	}
 }
