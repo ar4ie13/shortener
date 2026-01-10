@@ -126,6 +126,7 @@ func (c *Config) InitConfig() {
 	flag.DurationVar(&c.AuthConf.TokenExpiration, "e", defaultTokenExpiration, "token expiration")
 	flag.StringVar(&c.AuditConf.FileConf.AuditFilePath, "audit-file", defaultFileAuditPath, "audit file path")
 	flag.StringVar(&c.AuditConf.RemoteConf.RemoteServerURL, "audit-url", defaultRemoteAuditHost, "audit host url")
+	flag.BoolVar(&c.AuditConf.Enabled, "audit-enabled", true, "enable/disable audit")
 
 	if err = c.ShortURLTemplate.Set(defaultURL); err != nil {
 		log.Fatal().Err(err).Msg("Failed to set default URL")
@@ -187,6 +188,13 @@ func (c *Config) InitConfig() {
 
 	if hostAuditURL := os.Getenv("AUDIT_URL"); hostAuditURL != "" {
 		c.AuditConf.RemoteConf.RemoteServerURL = hostAuditURL
+	}
+
+	if auditEnabled := os.Getenv("AUDIT_ENABLED"); auditEnabled != "" {
+		c.AuditConf.Enabled, err = strconv.ParseBool(auditEnabled)
+		if err != nil {
+			log.Fatal().Err(err).Msg("cannot parse audit enabled environment variable")
+		}
 	}
 }
 

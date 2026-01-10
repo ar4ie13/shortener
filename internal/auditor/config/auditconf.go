@@ -7,6 +7,7 @@ import (
 
 // AuditConf contains configuration for both file and remote host audits
 type AuditConf struct {
+	Enabled    bool
 	FileConf   fileconf.FileAuditConfig
 	RemoteConf remoteconf.RemoteAuditConfig
 }
