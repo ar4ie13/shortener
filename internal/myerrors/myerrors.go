@@ -1,3 +1,4 @@
+// Package myerrors contains custom errors used by different layers
 package myerrors
 
 import "errors"

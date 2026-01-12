@@ -1,3 +1,4 @@
+// Package config reads flags and environment variables to initialize service config
 package config
 
 import (
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	auditconf "github.com/ar4ie13/shortener/internal/auditor/config"
 	authconf "github.com/ar4ie13/shortener/internal/auth/config"
 	pgconf "github.com/ar4ie13/shortener/internal/repository/db/postgresql/config"
 	fileconf "github.com/ar4ie13/shortener/internal/repository/filestorage/config"
@@ -39,6 +41,7 @@ type Config struct {
 	FilePath         fileconf.Config
 	PostgresDSN      pgconf.Config
 	AuthConf         authconf.Config
+	AuditConf        auditconf.AuditConf
 }
 
 // NewConfig constructor for Config
@@ -111,6 +114,8 @@ func (c *Config) InitConfig() {
 	defaultDatabaseDSN := ""
 	defaultSecretKey := "nHhjHgahbioHBGbBHJ"
 	defaultTokenExpiration := time.Hour * 24
+	defaultFileAuditPath := ""
+	defaultRemoteAuditHost := ""
 
 	flag.StringVar(&c.LocalServerAddr, "a", defaultServerAddr, "local server address")
 	flag.Var(&c.ShortURLTemplate, "b", "short url template")
@@ -119,19 +124,22 @@ func (c *Config) InitConfig() {
 	flag.StringVar(&c.PostgresDSN.DatabaseDSN, "d", defaultDatabaseDSN, "database DSN")
 	flag.StringVar(&c.AuthConf.SecretKey, "k", defaultSecretKey, "secret key")
 	flag.DurationVar(&c.AuthConf.TokenExpiration, "e", defaultTokenExpiration, "token expiration")
+	flag.StringVar(&c.AuditConf.FileConf.AuditFilePath, "audit-file", defaultFileAuditPath, "audit file path")
+	flag.StringVar(&c.AuditConf.RemoteConf.RemoteServerURL, "audit-url", defaultRemoteAuditHost, "audit host url")
+	flag.BoolVar(&c.AuditConf.Enabled, "audit-enabled", true, "enable/disable audit")
 
-	if err := c.ShortURLTemplate.Set(defaultURL); err != nil {
+	if err = c.ShortURLTemplate.Set(defaultURL); err != nil {
 		log.Fatal().Err(err).Msg("Failed to set default URL")
 	}
 
-	if err := c.LogLevel.Set(defaultLogLevel.String()); err != nil {
+	if err = c.LogLevel.Set(defaultLogLevel.String()); err != nil {
 		log.Fatal().Err(err).Msg("Failed to set default log level")
 	}
 
 	flag.Parse()
 
 	if serverAddr := os.Getenv("SERVER_ADDRESS"); serverAddr != "" {
-		if _, err := strconv.Unquote("\"" + serverAddr + "\""); err != nil {
+		if _, err = strconv.Unquote("\"" + serverAddr + "\""); err != nil {
 			parts := strings.SplitN(serverAddr, ":", 2)
 			if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 				log.Fatal().Err(err).Msg("Failed to set server address from SERVER_ADDRESS")
@@ -141,14 +149,14 @@ func (c *Config) InitConfig() {
 	}
 
 	if baseURL := os.Getenv("BASE_URL"); baseURL != "" {
-		err := c.ShortURLTemplate.Set(baseURL)
+		err = c.ShortURLTemplate.Set(baseURL)
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to set URL template from BASE_URL")
 		}
 	}
 
 	if logLevelStr := os.Getenv("LOG_LEVEL"); logLevelStr != "" {
-		err := c.LogLevel.Set(logLevelStr)
+		err = c.LogLevel.Set(logLevelStr)
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to set log level from LOG_LEVEL")
 		}
@@ -172,6 +180,21 @@ func (c *Config) InitConfig() {
 			log.Fatal().Err(err).Msg("cannot parse token expiration environment variable")
 		}
 
+	}
+
+	if fileAuditPath := os.Getenv("AUDIT_FILE"); fileAuditPath != "" {
+		c.AuditConf.FileConf.AuditFilePath = fileAuditPath
+	}
+
+	if hostAuditURL := os.Getenv("AUDIT_URL"); hostAuditURL != "" {
+		c.AuditConf.RemoteConf.RemoteServerURL = hostAuditURL
+	}
+
+	if auditEnabled := os.Getenv("AUDIT_ENABLED"); auditEnabled != "" {
+		c.AuditConf.Enabled, err = strconv.ParseBool(auditEnabled)
+		if err != nil {
+			log.Fatal().Err(err).Msg("cannot parse audit enabled environment variable")
+		}
 	}
 }
 

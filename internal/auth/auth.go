@@ -1,3 +1,4 @@
+// Package auth is used to perform users authorization and allow to retrieve their saved short urls.
 package auth
 
 import (

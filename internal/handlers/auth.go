@@ -10,8 +10,8 @@ import (
 // contextKey is a personal type for context UUID keys
 type contextUUIDKey string
 
-// userUUIDKey is a unique key for user_id in context
-const userUUIDKey contextUUIDKey = "user_id"
+// UserUUIDKey is a unique key for user_id in context
+const UserUUIDKey contextUUIDKey = "user_id"
 
 // authMiddleware used as middleware for authentication
 func (h Handler) authMiddleware(next http.Handler) http.Handler {
@@ -48,7 +48,7 @@ func (h Handler) authMiddleware(next http.Handler) http.Handler {
 			}
 		}
 		ctxUserUUID := userUUID.String()
-		ctx := context.WithValue(r.Context(), userUUIDKey, ctxUserUUID)
+		ctx := context.WithValue(r.Context(), UserUUIDKey, ctxUserUUID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

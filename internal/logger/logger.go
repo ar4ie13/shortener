@@ -1,3 +1,4 @@
+// Package logger contains customized settings for zerolog used to log service events
 package logger
 
 import (

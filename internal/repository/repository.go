@@ -1,3 +1,4 @@
+// Package repository is a repository layer which provide memory, file and database storage for the service
 package repository
 
 import (

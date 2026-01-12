@@ -13,6 +13,7 @@ cmd/client
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+*.cov
 
 # Binariesß
 cmd/shortener/main
@@ -31,3 +32,4 @@ Makefile
 # json.l filestorage files
 storage.jsonl
 internal/repository/filestorage/test.jsonl
+audit.jsonl
