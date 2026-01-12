@@ -1,3 +1,4 @@
+// Package postgresql contains repository logic for PostgreSQL.
 package postgresql
 
 import (

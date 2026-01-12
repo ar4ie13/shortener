@@ -1,3 +1,4 @@
+// Package memory contains memory storage logic of repository layer.
 package memory
 
 import (

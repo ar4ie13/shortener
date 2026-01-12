@@ -1,3 +1,4 @@
+// Package file contains file auditing logic of auditor service.
 package file
 
 import (

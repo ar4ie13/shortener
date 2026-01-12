@@ -1,3 +1,4 @@
+// Package config contains file storage configuration.
 package config
 
 // Config contains filepath to file storage
