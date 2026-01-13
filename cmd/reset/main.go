@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"go/ast"
 	"go/format"
-	"go/parser"
 	"go/token"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"golang.org/x/tools/go/packages"
 )
 
 const (
@@ -48,7 +49,7 @@ type ResetGen struct {
 
 func main() {
 	if len(os.Args) > 1 {
-		// Specific directory can be passed
+		// Can pass a specific directory as an argument
 		err := processDir(os.Args[1])
 		if err != nil {
 			log.Fatal(err)
@@ -64,32 +65,29 @@ func main() {
 }
 
 func processDir(root string) error {
-	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			return nil
-		}
+	cfg := &packages.Config{
+		Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax,
+		Dir:  root,
+	}
 
-		pkgFiles, err := parser.ParseDir(token.NewFileSet(), path, nil, parser.ParseComments)
-		if err != nil {
-			return nil
-		}
+	pkgs, err := packages.Load(cfg, "./...")
+	if err != nil {
+		return fmt.Errorf("failed to load packages: %w", err)
+	}
 
-		for pkgName, pkg := range pkgFiles {
-			if err = processPackage(path, pkgName, pkg); err != nil {
-				log.Printf("Error processing package %s in %s: %v", pkgName, path, err)
-			}
+	for _, pkg := range pkgs {
+		if err := processPackage(root, pkg); err != nil {
+			log.Printf("Error processing package %s: %v", pkg.PkgPath, err)
 		}
-		return nil
-	})
+	}
+	return nil
 }
 
-func processPackage(dir, pkgName string, pkg *ast.Package) error {
+func processPackage(root string, pkg *packages.Package) error {
 	var structures []structTypeInfo
 
-	for _, file := range pkg.Files {
+	// Process all files in the package
+	for _, file := range pkg.Syntax {
 		ast.Inspect(file, func(n ast.Node) bool {
 			switch x := n.(type) {
 			case *ast.GenDecl:
@@ -120,7 +118,13 @@ func processPackage(dir, pkgName string, pkg *ast.Package) error {
 		return nil
 	}
 
-	return generateResetFile(dir, pkgName, structures)
+	// Determine the directory for the output file
+	dir := root
+	if len(pkg.GoFiles) > 0 {
+		dir = filepath.Dir(pkg.GoFiles[0])
+	}
+
+	return generateResetFile(dir, pkg.Name, structures)
 }
 
 func hasGenerateResetComment(cg *ast.CommentGroup) bool {
@@ -172,7 +176,7 @@ func generateResetFile(dir, pkgName string, structs []structTypeInfo) error {
 	}
 
 	var buf bytes.Buffer
-	if err = tmpl.Execute(&buf, gen); err != nil {
+	if err := tmpl.Execute(&buf, gen); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
 	}
 
@@ -186,6 +190,7 @@ func generateResetFile(dir, pkgName string, structs []structTypeInfo) error {
 	return os.WriteFile(outputPath, formatted, 0644)
 }
 
+// generateFieldResetCode рекурсивно генерирует код сброса для поля
 func generateFieldResetCode(receiver, fieldName string, expr ast.Expr, indent int) string {
 	indentStr := strings.Repeat("\t", indent)
 
@@ -209,20 +214,13 @@ func generateFieldResetCode(receiver, fieldName string, expr ast.Expr, indent in
 		}
 
 	case *ast.ArrayType:
-
+		// []T — слайс
 		if t.Len == nil {
 			return fmt.Sprintf("%s%s.%s = %s.%s[:0]", indentStr, receiver, fieldName, receiver, fieldName)
 		}
 
-		return fmt.Sprintf("%sfor i := range %s.%s {\n"+
-			"%s\t%s.%s[i] = %s\n"+
-			"%s}",
-			indentStr,
-			receiver, fieldName,
-			indentStr,
-			receiver, fieldName,
-			zeroValueForType(t.Elt),
-			indentStr)
+		// [N]T — фиксированный массив
+		return fmt.Sprintf("%s%s.%s = %s.%s{}", indentStr, receiver, fieldName, receiver, fieldName)
 
 	case *ast.MapType:
 		return fmt.Sprintf("%sclear(%s.%s)", indentStr, receiver, fieldName)
@@ -269,23 +267,4 @@ func tryResetMethod(indent, receiver, fieldName string) string {
 		indent+"\t",
 		indent,
 	)
-}
-
-func zeroValueForType(expr ast.Expr) string {
-	switch t := expr.(type) {
-	case *ast.Ident:
-		switch t.Name {
-		case "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64",
-			"float32", "float64", "complex64", "complex128", "byte", "rune":
-			return "0"
-		case "string":
-			return "\"\""
-		case "bool":
-			return "false"
-		default:
-			return "nil"
-		}
-	default:
-		return "nil"
-	}
 }
