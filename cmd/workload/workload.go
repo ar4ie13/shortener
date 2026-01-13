@@ -43,7 +43,7 @@ func main() {
 		testJSONBatch()
 	}
 
-	time.Sleep(time.Duration(10 * time.Second))
+	time.Sleep(10 * time.Second)
 }
 
 func generateURL(length int) string {
