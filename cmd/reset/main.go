@@ -33,19 +33,23 @@ func (x *{{.Name}}) Reset() {
 `
 )
 
-type StructInfo struct {
-	Name   string
-	Fields []FieldInfo
-}
-
-type FieldInfo struct {
-	Code string
-}
-
-type ResetGen struct {
-	PackageName string
-	Structs     []StructInfo
-}
+type (
+	StructInfo struct {
+		Name   string
+		Fields []FieldInfo
+	}
+	FieldInfo struct {
+		Code string
+	}
+	ResetGen struct {
+		PackageName string
+		Structs     []StructInfo
+	}
+	structTypeInfo struct {
+		Name   string
+		Fields []*ast.Field
+	}
+)
 
 func main() {
 	if len(os.Args) > 1 {
@@ -86,29 +90,32 @@ func processDir(root string) error {
 func processPackage(root string, pkg *packages.Package) error {
 	var structures []structTypeInfo
 
-	// Process all files in the package
 	for _, file := range pkg.Syntax {
 		ast.Inspect(file, func(n ast.Node) bool {
-			switch x := n.(type) {
-			case *ast.GenDecl:
-				if x.Tok != token.TYPE {
-					return true
-				}
-				for _, spec := range x.Specs {
-					typeSpec, ok := spec.(*ast.TypeSpec)
-					if !ok {
-						continue
-					}
+			decl, ok := n.(*ast.GenDecl)
+			if !ok || decl.Tok != token.TYPE {
+				return true
+			}
 
-					if hasGenerateResetComment(x.Doc) {
-						if st, ok := typeSpec.Type.(*ast.StructType); ok {
-							structures = append(structures, structTypeInfo{
-								Name:   typeSpec.Name.Name,
-								Fields: st.Fields.List,
-							})
-						}
-					}
+			for _, spec := range decl.Specs {
+				ts, ok := spec.(*ast.TypeSpec)
+				if !ok {
+					continue
 				}
+
+				if !hasGenerateResetComment(decl.Doc) {
+					continue
+				}
+
+				st, ok := ts.Type.(*ast.StructType)
+				if !ok {
+					continue
+				}
+
+				structures = append(structures, structTypeInfo{
+					Name:   ts.Name.Name,
+					Fields: st.Fields.List,
+				})
 			}
 			return true
 		})
@@ -118,7 +125,6 @@ func processPackage(root string, pkg *packages.Package) error {
 		return nil
 	}
 
-	// Determine the directory for the output file
 	dir := root
 	if len(pkg.GoFiles) > 0 {
 		dir = filepath.Dir(pkg.GoFiles[0])
@@ -139,11 +145,6 @@ func hasGenerateResetComment(cg *ast.CommentGroup) bool {
 	return false
 }
 
-type structTypeInfo struct {
-	Name   string
-	Fields []*ast.Field
-}
-
 func generateResetFile(dir, pkgName string, structs []structTypeInfo) error {
 	tmpl, err := template.New("reset").Parse(resetTemplate)
 	if err != nil {
@@ -156,23 +157,29 @@ func generateResetFile(dir, pkgName string, structs []structTypeInfo) error {
 	}
 
 	for _, st := range structs {
-		fieldInfos := make([]FieldInfo, 0, len(st.Fields))
+		var fields []FieldInfo
 		for _, field := range st.Fields {
 			for _, name := range field.Names {
-				fieldName := name.Name
-				expr := field.Type
-
-				resetCode := generateFieldResetCode("x", fieldName, expr, 1)
-				if resetCode != "" {
-					fieldInfos = append(fieldInfos, FieldInfo{Code: resetCode})
+				code := generateFieldResetCode("x", name.Name, field.Type, 1)
+				if code == "" {
+					continue
 				}
+				fields = append(fields, FieldInfo{Code: code})
 			}
+		}
+
+		if len(fields) == 0 {
+			continue
 		}
 
 		gen.Structs = append(gen.Structs, StructInfo{
 			Name:   st.Name,
-			Fields: fieldInfos,
+			Fields: fields,
 		})
+	}
+
+	if len(gen.Structs) == 0 {
+		return nil
 	}
 
 	var buf bytes.Buffer
@@ -180,7 +187,6 @@ func generateResetFile(dir, pkgName string, structs []structTypeInfo) error {
 		return fmt.Errorf("failed to execute template: %w", err)
 	}
 
-	// Format the generated code
 	formatted, err := format.Source(buf.Bytes())
 	if err != nil {
 		return fmt.Errorf("failed to format generated code: %w", err)
@@ -214,12 +220,12 @@ func generateFieldResetCode(receiver, fieldName string, expr ast.Expr, indent in
 		}
 
 	case *ast.ArrayType:
-		// []T — слайс
+		// []T — slice
 		if t.Len == nil {
 			return fmt.Sprintf("%s%s.%s = %s.%s[:0]", indentStr, receiver, fieldName, receiver, fieldName)
 		}
 
-		// [N]T — фиксированный массив
+		// [N]T — array
 		return fmt.Sprintf("%s%s.%s = %s.%s{}", indentStr, receiver, fieldName, receiver, fieldName)
 
 	case *ast.MapType:
@@ -248,23 +254,21 @@ func generateFieldResetCode(receiver, fieldName string, expr ast.Expr, indent in
 }
 
 func tryResetMethod(indent, receiver, fieldName string) string {
+	innerIndent := indent + "\t"
+
 	if fieldName == "" {
-		// Direct struct
-		return fmt.Sprintf("%sif r, ok := interface{ Reset() }(%s).(interface{ Reset() }); ok {\n"+
-			"%s\tr.Reset()\n"+
-			"%s}",
+		return fmt.Sprintf(`
+%sif r, ok := any(%s).(interface{ Reset() }); ok {
+%s	r.Reset()
+%s}`,
 			indent, receiver,
-			indent+"\t",
-			indent,
+			innerIndent, indent,
 		)
 	}
 
-	return fmt.Sprintf("%sif r, ok := interface{ Reset() }(%s.%s).(interface{ Reset() }); ok && %s.%s != nil {\n"+
-		"%s\tr.Reset()\n"+
-		"%s}",
-		indent, receiver, fieldName,
-		receiver, fieldName,
-		indent+"\t",
-		indent,
-	)
+	multiline := `
+%sif r, ok := any(%s.%s).(interface{ Reset() }); ok && %s.%s != nil {
+%s	r.Reset()
+%s}`
+	return fmt.Sprintf(multiline, indent, receiver, fieldName, receiver, fieldName, innerIndent, indent)
 }

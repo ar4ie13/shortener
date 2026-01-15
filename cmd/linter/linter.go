@@ -4,6 +4,7 @@ package main
 
 import (
 	"go/ast"
+	"go/types"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
@@ -43,9 +44,13 @@ func run(pass *analysis.Pass) (interface{}, error) {
 			currentFunc = x
 		case *ast.CallExpr:
 			// Check for direct calls to panic
-			if ident, ok := x.Fun.(*ast.Ident); ok && ident.Name == "panic" {
-				pass.Reportf(x.Pos(), "forbidden use of panic()")
-				return true
+			if ident, ok := x.Fun.(*ast.Ident); ok {
+				if obj, ok := pass.TypesInfo.Uses[ident]; ok {
+					if builtin, ok := obj.(*types.Builtin); ok && builtin.Name() == "panic" {
+						pass.Reportf(x.Pos(), "forbidden use of panic()")
+						return true
+					}
+				}
 			}
 
 			// Check for selector expressions like log.Fatal or os.Exit
@@ -55,7 +60,20 @@ func run(pass *analysis.Pass) (interface{}, error) {
 					return true
 				}
 
-				switch xIdent.Name {
+				obj, ok := pass.TypesInfo.Uses[xIdent]
+				if !ok {
+					return true
+				}
+
+				pkgName, ok := obj.(*types.PkgName)
+				if !ok {
+					return true
+				}
+
+				pkg := pkgName.Imported()
+				pkgPath := pkg.Path()
+
+				switch pkgPath {
 				case "log":
 					switch sel.Sel.Name {
 					case "Fatal", "Fatalf", "Fatalln":
