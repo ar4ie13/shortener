@@ -1,3 +1,4 @@
+// Package config used for configuration of auditor service.
 package config
 
 import (

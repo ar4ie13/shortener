@@ -13,13 +13,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// Repository is a main repository object
-type Repository struct {
-	m  *memory.MemStorage
-	f  *filestorage.FileStorage
-	db *postgresql.DB
-}
-
 // NewRepository return the correct interface for service depending on used store method
 func NewRepository(
 	ctx context.Context,

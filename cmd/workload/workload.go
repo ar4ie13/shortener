@@ -31,6 +31,7 @@ type jsonRequestBatch struct {
 }
 
 func main() {
+
 	for i := 0; i < 1000; i++ {
 		testRoot()
 	}
@@ -42,7 +43,7 @@ func main() {
 		testJSONBatch()
 	}
 
-	time.Sleep(time.Duration(10 * time.Second))
+	time.Sleep(10 * time.Second)
 }
 
 func generateURL(length int) string {

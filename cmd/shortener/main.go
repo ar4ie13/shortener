@@ -15,8 +15,17 @@ import (
 	"github.com/ar4ie13/shortener/internal/service"
 )
 
+var (
+	buildVersion = "N/A"
+	buildDate    = "N/A"
+	buildCommit  = "N/A"
+)
+
 // main starts run functions which contains all objects initialization
 func main() {
+	fmt.Println("Build version: " + buildVersion)
+	fmt.Println("Build date: " + buildDate)
+	fmt.Println("Build commit: " + buildCommit)
 	if err := run(); err != nil {
 		log.Fatal(err)
 	}

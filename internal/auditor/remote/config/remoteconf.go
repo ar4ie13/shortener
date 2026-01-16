@@ -1,3 +1,4 @@
+// Package config contains remote host configuration for auditor service.
 package config
 
 // RemoteAuditConfig contains remote server URL

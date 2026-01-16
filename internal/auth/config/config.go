@@ -1,3 +1,4 @@
+// Package config contains authentication service configuration for auditor service.
 package config
 
 import "time"

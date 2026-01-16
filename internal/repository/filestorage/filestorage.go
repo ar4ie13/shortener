@@ -1,3 +1,4 @@
+// Package filestorage contain file storage repository logic
 package filestorage
 
 import (

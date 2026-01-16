@@ -1,3 +1,4 @@
+// Package remote contains remote host auditing logic of auditor service.
 package remote
 
 import (

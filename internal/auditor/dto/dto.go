@@ -1,3 +1,4 @@
+// Package dto contains struct used by auditor service
 package dto
 
 import (
