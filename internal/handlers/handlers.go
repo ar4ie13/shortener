@@ -55,6 +55,7 @@ type Config interface {
 	GetShortURLTemplate() string
 	GetLogLevel() zerolog.Level
 	CheckPostgresConnection(ctx context.Context) error
+	GetHTTPS() bool
 }
 
 // Handler is a main object for package handlers
@@ -73,6 +74,7 @@ func NewHandler(s Service, c Config, a Auth, o Auditor, zlog zerolog.Logger) *Ha
 
 // ListenAndServe starts web server with specified chi router
 func (h Handler) ListenAndServe() error {
+
 	router := chi.NewRouter()
 
 	// adding pprof to /debug
@@ -100,11 +102,21 @@ func (h Handler) ListenAndServe() error {
 			})
 		})
 	})
-
+	srv := &http.Server{
+		Addr:    h.cfg.GetLocalServerAddr(),
+		Handler: router,
+	}
 	h.zlog.Info().Msgf("listening on %v\nURL Template: %v\nLog Level: %v", h.cfg.GetLocalServerAddr(), h.cfg.GetShortURLTemplate(), h.cfg.GetLogLevel())
+	switch h.cfg.GetHTTPS() {
+	case true:
+		if err := srv.ListenAndServeTLS(h.cfg.GetLocalServerAddr(), h.cfg.GetShortURLTemplate()); err != nil {
+			return err
+		}
+	default:
+		if err := srv.ListenAndServe(); err != nil {
+			return err
+		}
 
-	if err := http.ListenAndServe(h.cfg.GetLocalServerAddr(), router); err != nil {
-		return err
 	}
 
 	return nil

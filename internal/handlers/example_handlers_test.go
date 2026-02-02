@@ -78,6 +78,7 @@ func (m mockConfig) GetLocalServerAddr() string                      { return ":
 func (m mockConfig) GetShortURLTemplate() string                     { return "http://localhost:8080" }
 func (m mockConfig) GetLogLevel() zerolog.Level                      { return zerolog.InfoLevel }
 func (m mockConfig) CheckPostgresConnection(_ context.Context) error { return nil }
+func (m mockConfig) GetHTTPS() bool                                  { return false }
 
 // --- Helper to create test server with a known user context ---
 

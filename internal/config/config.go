@@ -42,6 +42,7 @@ type Config struct {
 	PostgresDSN      pgconf.Config
 	AuthConf         authconf.Config
 	AuditConf        auditconf.AuditConf
+	HTTPS            bool
 }
 
 // NewConfig constructor for Config
@@ -127,6 +128,7 @@ func (c *Config) InitConfig() {
 	flag.StringVar(&c.AuditConf.FileConf.AuditFilePath, "audit-file", defaultFileAuditPath, "audit file path")
 	flag.StringVar(&c.AuditConf.RemoteConf.RemoteServerURL, "audit-url", defaultRemoteAuditHost, "audit host url")
 	flag.BoolVar(&c.AuditConf.Enabled, "audit-enabled", true, "enable/disable audit")
+	flag.BoolVar(&c.HTTPS, "s", false, "enable https")
 
 	if err = c.ShortURLTemplate.Set(defaultURL); err != nil {
 		log.Fatal().Err(err).Msg("Failed to set default URL")
@@ -196,6 +198,13 @@ func (c *Config) InitConfig() {
 			log.Fatal().Err(err).Msg("cannot parse audit enabled environment variable")
 		}
 	}
+
+	if httpsEnabled := os.Getenv("ENABLE_HTTPS"); httpsEnabled != "" {
+		c.HTTPS, err = strconv.ParseBool(httpsEnabled)
+		if err != nil {
+			log.Fatal().Err(err).Msg("cannot parse https enabled environment variable")
+		}
+	}
 }
 
 // CheckPostgresConnection validates the connection to PostgreSQL database
@@ -226,4 +235,8 @@ func (c *Config) GetShortURLTemplate() string {
 // GetLogLevel returns logging level. Used in logger.NewLogger constructor.
 func (c *Config) GetLogLevel() zerolog.Level {
 	return c.LogLevel.Level
+}
+
+func (c *Config) GetHTTPS() bool {
+	return c.HTTPS
 }
