@@ -43,6 +43,8 @@ type Config struct {
 	AuthConf         authconf.Config
 	AuditConf        auditconf.AuditConf
 	HTTPS            bool
+	TLSCertPath      string
+	TLSKeyPath       string
 }
 
 // NewConfig constructor for Config
@@ -117,6 +119,8 @@ func (c *Config) InitConfig() {
 	defaultTokenExpiration := time.Hour * 24
 	defaultFileAuditPath := ""
 	defaultRemoteAuditHost := ""
+	defaultTLSCert := "cert.pem"
+	defaultTLSKey := "key.pem"
 
 	flag.StringVar(&c.LocalServerAddr, "a", defaultServerAddr, "local server address")
 	flag.Var(&c.ShortURLTemplate, "b", "short url template")
@@ -129,6 +133,8 @@ func (c *Config) InitConfig() {
 	flag.StringVar(&c.AuditConf.RemoteConf.RemoteServerURL, "audit-url", defaultRemoteAuditHost, "audit host url")
 	flag.BoolVar(&c.AuditConf.Enabled, "audit-enabled", true, "enable/disable audit")
 	flag.BoolVar(&c.HTTPS, "s", false, "enable https")
+	flag.StringVar(&c.TLSCertPath, "tls-cert", defaultTLSCert, "TLS certificate")
+	flag.StringVar(&c.TLSKeyPath, "tls-key", defaultTLSKey, "TLS key")
 
 	if err = c.ShortURLTemplate.Set(defaultURL); err != nil {
 		log.Fatal().Err(err).Msg("Failed to set default URL")
@@ -205,6 +211,13 @@ func (c *Config) InitConfig() {
 			log.Fatal().Err(err).Msg("cannot parse https enabled environment variable")
 		}
 	}
+
+	if tlsCertPath := os.Getenv("TLS_CERT_PATH"); tlsCertPath != "" {
+		c.TLSCertPath = tlsCertPath
+	}
+	if tlsKeyPath := os.Getenv("TLS_KEY_PATH"); tlsKeyPath != "" {
+		c.TLSKeyPath = tlsKeyPath
+	}
 }
 
 // CheckPostgresConnection validates the connection to PostgreSQL database
@@ -239,4 +252,12 @@ func (c *Config) GetLogLevel() zerolog.Level {
 
 func (c *Config) GetHTTPS() bool {
 	return c.HTTPS
+}
+
+func (c *Config) GetTLSCertPath() string {
+	return c.TLSCertPath
+}
+
+func (c *Config) GetTLSKeyPath() string {
+	return c.TLSKeyPath
 }

@@ -56,6 +56,8 @@ type Config interface {
 	GetLogLevel() zerolog.Level
 	CheckPostgresConnection(ctx context.Context) error
 	GetHTTPS() bool
+	GetTLSCertPath() string
+	GetTLSKeyPath() string
 }
 
 // Handler is a main object for package handlers
@@ -109,7 +111,7 @@ func (h Handler) ListenAndServe() error {
 	h.zlog.Info().Msgf("listening on %v\nURL Template: %v\nLog Level: %v", h.cfg.GetLocalServerAddr(), h.cfg.GetShortURLTemplate(), h.cfg.GetLogLevel())
 	switch h.cfg.GetHTTPS() {
 	case true:
-		if err := srv.ListenAndServeTLS(h.cfg.GetLocalServerAddr(), h.cfg.GetShortURLTemplate()); err != nil {
+		if err := srv.ListenAndServeTLS(h.cfg.GetTLSCertPath(), h.cfg.GetTLSKeyPath()); err != nil {
 			return err
 		}
 	default:
