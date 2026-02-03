@@ -45,7 +45,7 @@ func run() error {
 	hdlr := handlers.NewHandler(srv, cfg, authorize, audit, zlog.Logger)
 
 	if err = hdlr.ListenAndServe(); err != nil {
-		return fmt.Errorf("shortener service error: %w", err)
+		return fmt.Errorf("HTTP server ListenAndServe: %v", err)
 	}
 
 	return nil

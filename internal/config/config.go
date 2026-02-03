@@ -187,6 +187,7 @@ func (c *Config) InitConfig() {
 	flag.Parse()
 
 	// Environment variables (highest priority - overrides flags and JSON)
+
 	if serverAddr := os.Getenv("SERVER_ADDRESS"); serverAddr != "" {
 		if _, err = strconv.Unquote("\"" + serverAddr + "\""); err != nil {
 			parts := strings.SplitN(serverAddr, ":", 2)

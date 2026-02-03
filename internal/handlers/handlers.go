@@ -8,7 +8,10 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/ar4ie13/shortener/internal/model"
 	"github.com/ar4ie13/shortener/internal/myerrors"
@@ -108,19 +111,37 @@ func (h Handler) ListenAndServe() error {
 		Addr:    h.cfg.GetLocalServerAddr(),
 		Handler: router,
 	}
+
+	// Graceful shutdown
+	idleConnsClosed := make(chan struct{})
+
+	sigint := make(chan os.Signal, 1)
+
+	signal.Notify(sigint, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+
+	go func() {
+		<-sigint
+		if err := srv.Shutdown(context.Background()); err != nil {
+			h.zlog.Printf("HTTP server Shutdown: %v", err)
+		}
+		close(idleConnsClosed)
+	}()
+
 	h.zlog.Info().Msgf("listening on %v\nURL Template: %v\nLog Level: %v", h.cfg.GetLocalServerAddr(), h.cfg.GetShortURLTemplate(), h.cfg.GetLogLevel())
 	switch h.cfg.GetHTTPS() {
 	case true:
-		if err := srv.ListenAndServeTLS(h.cfg.GetTLSCertPath(), h.cfg.GetTLSKeyPath()); err != nil {
+		if err := srv.ListenAndServeTLS(h.cfg.GetTLSCertPath(), h.cfg.GetTLSKeyPath()); !errors.Is(err, http.ErrServerClosed) {
 			return err
 		}
 	default:
-		if err := srv.ListenAndServe(); err != nil {
+		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			return err
 		}
 
 	}
+	<-idleConnsClosed
 
+	h.zlog.Info().Msgf("shortener server shutdown gracefully")
 	return nil
 }
 
