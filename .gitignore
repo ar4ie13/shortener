@@ -33,6 +33,8 @@ Makefile
 storage.jsonl
 internal/repository/filestorage/test.jsonl
 audit.jsonl
+audit_test.jsonl
+config.json
 
 # linters configs
 staticcheck.conf

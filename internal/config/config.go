@@ -4,6 +4,7 @@ package config
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -35,16 +36,31 @@ type ShortURLTemplate string
 
 // Config struct used for program flag variables
 type Config struct {
-	LocalServerAddr  string
-	ShortURLTemplate ShortURLTemplate
-	LogLevel         LogLevel
-	FilePath         fileconf.Config
-	PostgresDSN      pgconf.Config
-	AuthConf         authconf.Config
-	AuditConf        auditconf.AuditConf
-	HTTPS            bool
-	TLSCertPath      string
-	TLSKeyPath       string
+	LocalServerAddr  string              `json:"local_server_addr,omitempty"`
+	ShortURLTemplate ShortURLTemplate    `json:"short_url_template,omitempty"`
+	LogLevel         LogLevel            `json:"log_level,omitempty"`
+	FilePath         fileconf.Config     `json:"file_config,omitempty"`
+	PostgresDSN      pgconf.Config       `json:"postgres_config,omitempty"`
+	AuthConf         authconf.Config     `json:"auth_config,omitempty"`
+	AuditConf        auditconf.AuditConf `json:"audit_config,omitempty"`
+	HTTPS            bool                `json:"https_enabled,omitempty"`
+	TLSCertPath      string              `json:"tls_cert_path,omitempty"`
+	TLSKeyPath       string              `json:"tls_key_path,omitempty"`
+	ConfigPath       string              `json:"config_path,omitempty"`
+}
+
+type ConfigTest struct {
+	LocalServerAddr  string              `json:"local_server_addr,omitempty"`
+	ShortURLTemplate ShortURLTemplate    `json:"short_url_template,omitempty"`
+	LogLevel         LogLevel            `json:"log_level,omitempty"`
+	FilePath         fileconf.Config     `json:"file_config,omitempty"`
+	PostgresDSN      pgconf.Config       `json:"postgres_config,omitempty"`
+	AuthConf         authconf.Config     `json:"auth_config,omitempty"`
+	AuditConf        auditconf.AuditConf `json:"audit_config,omitempty"`
+	HTTPS            bool                `json:"https_enabled,omitempty"`
+	TLSCertPath      string              `json:"tls_cert_path,omitempty"`
+	TLSKeyPath       string              `json:"tls_key_path,omitempty"`
+	ConfigPath       string              `json:"config_path,omitempty"`
 }
 
 // NewConfig constructor for Config
@@ -89,7 +105,7 @@ func (u *ShortURLTemplate) Set(value string) error {
 
 // LogLevel type for custom log level flag
 type LogLevel struct {
-	Level zerolog.Level
+	Level zerolog.Level `json:"level"`
 }
 
 // String returns log level as string
@@ -119,8 +135,9 @@ func (c *Config) InitConfig() {
 	defaultTokenExpiration := time.Hour * 24
 	defaultFileAuditPath := ""
 	defaultRemoteAuditHost := ""
-	defaultTLSCert := "cert.pem"
-	defaultTLSKey := "key.pem"
+	defaultTLSCert := ""
+	defaultTLSKey := ""
+	defaultConfigPath := ""
 
 	flag.StringVar(&c.LocalServerAddr, "a", defaultServerAddr, "local server address")
 	flag.Var(&c.ShortURLTemplate, "b", "short url template")
@@ -135,6 +152,7 @@ func (c *Config) InitConfig() {
 	flag.BoolVar(&c.HTTPS, "s", false, "enable https")
 	flag.StringVar(&c.TLSCertPath, "tls-cert", defaultTLSCert, "TLS certificate")
 	flag.StringVar(&c.TLSKeyPath, "tls-key", defaultTLSKey, "TLS key")
+	flag.StringVar(&c.ConfigPath, "c", defaultConfigPath, "config file path")
 
 	if err = c.ShortURLTemplate.Set(defaultURL); err != nil {
 		log.Fatal().Err(err).Msg("Failed to set default URL")
@@ -144,8 +162,31 @@ func (c *Config) InitConfig() {
 		log.Fatal().Err(err).Msg("Failed to set default log level")
 	}
 
+	// Determine config file path (check env first, then pre-scan args for -c flag)
+	configPath := defaultConfigPath
+	if envConfig := os.Getenv("CONFIG"); envConfig != "" {
+		configPath = envConfig
+	}
+	for i, arg := range os.Args[1:] {
+		if arg == "-c" && i+1 < len(os.Args)-1 {
+			configPath = os.Args[i+2]
+			break
+		}
+		if strings.HasPrefix(arg, "-c=") {
+			configPath = strings.TrimPrefix(arg, "-c=")
+			break
+		}
+	}
+
+	// Load JSON config file (lowest priority)
+	if err = c.loadConfigFile(configPath); err != nil {
+		log.Fatal().Err(err).Msg("Failed to load config file")
+	}
+
+	// Parse flags (medium priority - overrides JSON)
 	flag.Parse()
 
+	// Environment variables (highest priority - overrides flags and JSON)
 	if serverAddr := os.Getenv("SERVER_ADDRESS"); serverAddr != "" {
 		if _, err = strconv.Unquote("\"" + serverAddr + "\""); err != nil {
 			parts := strings.SplitN(serverAddr, ":", 2)
@@ -215,9 +256,75 @@ func (c *Config) InitConfig() {
 	if tlsCertPath := os.Getenv("TLS_CERT_PATH"); tlsCertPath != "" {
 		c.TLSCertPath = tlsCertPath
 	}
+
 	if tlsKeyPath := os.Getenv("TLS_KEY_PATH"); tlsKeyPath != "" {
 		c.TLSKeyPath = tlsKeyPath
 	}
+
+	if configPath := os.Getenv("CONFIG"); configPath != "" {
+		c.ConfigPath = configPath
+	}
+}
+
+// loadConfigFile loads configuration from JSON file into the Config struct.
+// Returns error only for JSON parsing issues, not for missing files.
+func (c *Config) loadConfigFile(path string) error {
+	if path == "" {
+		return nil
+	}
+
+	file, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	var fileConfig Config
+	if err = json.Unmarshal(file, &fileConfig); err != nil {
+		return fmt.Errorf("failed to parse config file: %w", err)
+	}
+
+	// Apply non-zero values from file
+	if fileConfig.LocalServerAddr != "" {
+		c.LocalServerAddr = fileConfig.LocalServerAddr
+	}
+	if fileConfig.ShortURLTemplate != "" {
+		c.ShortURLTemplate = fileConfig.ShortURLTemplate
+	}
+	if fileConfig.LogLevel.Level != zerolog.NoLevel {
+		c.LogLevel = fileConfig.LogLevel
+	}
+	if fileConfig.FilePath.FilePath != "" {
+		c.FilePath = fileConfig.FilePath
+	}
+	if fileConfig.PostgresDSN.DatabaseDSN != "" {
+		c.PostgresDSN = fileConfig.PostgresDSN
+	}
+	if fileConfig.AuthConf.SecretKey != "" {
+		c.AuthConf.SecretKey = fileConfig.AuthConf.SecretKey
+	}
+	if fileConfig.AuthConf.TokenExpiration != 0 {
+		c.AuthConf.TokenExpiration = fileConfig.AuthConf.TokenExpiration
+	}
+	if fileConfig.AuditConf.FileConf.AuditFilePath != "" {
+		c.AuditConf.FileConf.AuditFilePath = fileConfig.AuditConf.FileConf.AuditFilePath
+	}
+	if fileConfig.AuditConf.RemoteConf.RemoteServerURL != "" {
+		c.AuditConf.RemoteConf.RemoteServerURL = fileConfig.AuditConf.RemoteConf.RemoteServerURL
+	}
+	if fileConfig.HTTPS {
+		c.HTTPS = fileConfig.HTTPS
+	}
+	if fileConfig.TLSCertPath != "" {
+		c.TLSCertPath = fileConfig.TLSCertPath
+	}
+	if fileConfig.TLSKeyPath != "" {
+		c.TLSKeyPath = fileConfig.TLSKeyPath
+	}
+
+	return nil
 }
 
 // CheckPostgresConnection validates the connection to PostgreSQL database

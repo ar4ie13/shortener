@@ -3,5 +3,5 @@ package config
 
 // RemoteAuditConfig contains remote server URL
 type RemoteAuditConfig struct {
-	RemoteServerURL string
+	RemoteServerURL string `json:"remote_server_url,omitempty"`
 }

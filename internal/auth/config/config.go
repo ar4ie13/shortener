@@ -4,6 +4,6 @@ package config
 import "time"
 
 type Config struct {
-	SecretKey       string
-	TokenExpiration time.Duration
+	SecretKey       string        `json:"secret_key,omitempty"`
+	TokenExpiration time.Duration `json:"token_expiration,omitempty"`
 }

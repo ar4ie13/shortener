@@ -8,7 +8,7 @@ import (
 
 // AuditConf contains configuration for both file and remote host audits
 type AuditConf struct {
-	Enabled    bool
-	FileConf   fileconf.FileAuditConfig
-	RemoteConf remoteconf.RemoteAuditConfig
+	Enabled    bool                         `json:"enabled,omitempty"`
+	FileConf   fileconf.FileAuditConfig     `json:"file_audit_config,omitempty"`
+	RemoteConf remoteconf.RemoteAuditConfig `json:"remote_audit_config,omitempty"`
 }

@@ -3,5 +3,5 @@ package config
 
 // FileAuditConfig contains path to audit file
 type FileAuditConfig struct {
-	AuditFilePath string
+	AuditFilePath string `json:"audit_file_path,omitempty"`
 }
