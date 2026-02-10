@@ -74,10 +74,27 @@ func (m mockAuditor) Notify(_ string, _ uuid.UUID, _ string) {}
 
 type mockConfig struct{}
 
-func (m mockConfig) GetLocalServerAddr() string                      { return ":8080" }
-func (m mockConfig) GetShortURLTemplate() string                     { return "http://localhost:8080" }
-func (m mockConfig) GetLogLevel() zerolog.Level                      { return zerolog.InfoLevel }
-func (m mockConfig) CheckPostgresConnection(_ context.Context) error { return nil }
+func (m mockConfig) GetLocalServerAddr() string {
+	return ":8080"
+}
+func (m mockConfig) GetShortURLTemplate() string {
+	return "http://localhost:8080"
+}
+func (m mockConfig) GetLogLevel() zerolog.Level {
+	return zerolog.InfoLevel
+}
+func (m mockConfig) CheckPostgresConnection(_ context.Context) error {
+	return nil
+}
+func (m mockConfig) GetHTTPS() bool {
+	return false
+}
+func (m mockConfig) GetTLSCertPath() string {
+	return ""
+}
+func (m mockConfig) GetTLSKeyPath() string {
+	return ""
+}
 
 // --- Helper to create test server with a known user context ---
 

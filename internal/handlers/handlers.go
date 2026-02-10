@@ -8,7 +8,10 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/ar4ie13/shortener/internal/model"
 	"github.com/ar4ie13/shortener/internal/myerrors"
@@ -55,6 +58,9 @@ type Config interface {
 	GetShortURLTemplate() string
 	GetLogLevel() zerolog.Level
 	CheckPostgresConnection(ctx context.Context) error
+	GetHTTPS() bool
+	GetTLSCertPath() string
+	GetTLSKeyPath() string
 }
 
 // Handler is a main object for package handlers
@@ -71,8 +77,7 @@ func NewHandler(s Service, c Config, a Auth, o Auditor, zlog zerolog.Logger) *Ha
 	return &Handler{s, c, a, o, zlog}
 }
 
-// ListenAndServe starts web server with specified chi router
-func (h Handler) ListenAndServe() error {
+func (h Handler) RegisterRoutes() *chi.Mux {
 	router := chi.NewRouter()
 
 	// adding pprof to /debug
@@ -100,13 +105,47 @@ func (h Handler) ListenAndServe() error {
 			})
 		})
 	})
+	return router
+}
 
-	h.zlog.Info().Msgf("listening on %v\nURL Template: %v\nLog Level: %v", h.cfg.GetLocalServerAddr(), h.cfg.GetShortURLTemplate(), h.cfg.GetLogLevel())
+// ListenAndServe starts web server with specified chi router
+func (h Handler) ListenAndServe() error {
 
-	if err := http.ListenAndServe(h.cfg.GetLocalServerAddr(), router); err != nil {
-		return err
+	srv := &http.Server{
+		Addr:    h.cfg.GetLocalServerAddr(),
+		Handler: h.RegisterRoutes(),
 	}
 
+	// Graceful shutdown
+	idleConnsClosed := make(chan struct{})
+
+	sigint := make(chan os.Signal, 1)
+
+	signal.Notify(sigint, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+
+	go func() {
+		<-sigint
+		if err := srv.Shutdown(context.Background()); err != nil {
+			h.zlog.Printf("HTTP server Shutdown: %v", err)
+		}
+		close(idleConnsClosed)
+	}()
+
+	h.zlog.Info().Msgf("listening on %v\nURL Template: %v\nLog Level: %v", h.cfg.GetLocalServerAddr(), h.cfg.GetShortURLTemplate(), h.cfg.GetLogLevel())
+	switch h.cfg.GetHTTPS() {
+	case true:
+		if err := srv.ListenAndServeTLS(h.cfg.GetTLSCertPath(), h.cfg.GetTLSKeyPath()); !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
+	default:
+		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
+
+	}
+	<-idleConnsClosed
+
+	h.zlog.Info().Msgf("shortener server shutdown gracefully")
 	return nil
 }
 

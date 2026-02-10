@@ -4,6 +4,7 @@ package config
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -35,13 +36,17 @@ type ShortURLTemplate string
 
 // Config struct used for program flag variables
 type Config struct {
-	LocalServerAddr  string
-	ShortURLTemplate ShortURLTemplate
-	LogLevel         LogLevel
-	FilePath         fileconf.Config
-	PostgresDSN      pgconf.Config
-	AuthConf         authconf.Config
-	AuditConf        auditconf.AuditConf
+	LocalServerAddr  string              `json:"local_server_addr,omitempty"`
+	ShortURLTemplate ShortURLTemplate    `json:"short_url_template,omitempty"`
+	LogLevel         LogLevel            `json:"log_level,omitempty"`
+	FilePath         fileconf.Config     `json:"file_config,omitempty"`
+	PostgresDSN      pgconf.Config       `json:"postgres_config,omitempty"`
+	AuthConf         authconf.Config     `json:"auth_config,omitempty"`
+	AuditConf        auditconf.AuditConf `json:"audit_config,omitempty"`
+	HTTPS            bool                `json:"https_enabled,omitempty"`
+	TLSCertPath      string              `json:"tls_cert_path,omitempty"`
+	TLSKeyPath       string              `json:"tls_key_path,omitempty"`
+	ConfigPath       string              `json:"config_path,omitempty"`
 }
 
 // NewConfig constructor for Config
@@ -86,7 +91,7 @@ func (u *ShortURLTemplate) Set(value string) error {
 
 // LogLevel type for custom log level flag
 type LogLevel struct {
-	Level zerolog.Level
+	Level zerolog.Level `json:"level"`
 }
 
 // String returns log level as string
@@ -116,6 +121,9 @@ func (c *Config) InitConfig() {
 	defaultTokenExpiration := time.Hour * 24
 	defaultFileAuditPath := ""
 	defaultRemoteAuditHost := ""
+	defaultTLSCert := ""
+	defaultTLSKey := ""
+	defaultConfigPath := ""
 
 	flag.StringVar(&c.LocalServerAddr, "a", defaultServerAddr, "local server address")
 	flag.Var(&c.ShortURLTemplate, "b", "short url template")
@@ -127,6 +135,10 @@ func (c *Config) InitConfig() {
 	flag.StringVar(&c.AuditConf.FileConf.AuditFilePath, "audit-file", defaultFileAuditPath, "audit file path")
 	flag.StringVar(&c.AuditConf.RemoteConf.RemoteServerURL, "audit-url", defaultRemoteAuditHost, "audit host url")
 	flag.BoolVar(&c.AuditConf.Enabled, "audit-enabled", true, "enable/disable audit")
+	flag.BoolVar(&c.HTTPS, "s", false, "enable https")
+	flag.StringVar(&c.TLSCertPath, "tls-cert", defaultTLSCert, "TLS certificate")
+	flag.StringVar(&c.TLSKeyPath, "tls-key", defaultTLSKey, "TLS key")
+	flag.StringVar(&c.ConfigPath, "c", defaultConfigPath, "config file path")
 
 	if err = c.ShortURLTemplate.Set(defaultURL); err != nil {
 		log.Fatal().Err(err).Msg("Failed to set default URL")
@@ -136,7 +148,31 @@ func (c *Config) InitConfig() {
 		log.Fatal().Err(err).Msg("Failed to set default log level")
 	}
 
+	// Determine config file path (check env first, then pre-scan args for -c flag)
+	configPath := defaultConfigPath
+	if envConfig := os.Getenv("CONFIG"); envConfig != "" {
+		configPath = envConfig
+	}
+	for i, arg := range os.Args[1:] {
+		if arg == "-c" && i+1 < len(os.Args)-1 {
+			configPath = os.Args[i+2]
+			break
+		}
+		if strings.HasPrefix(arg, "-c=") {
+			configPath = strings.TrimPrefix(arg, "-c=")
+			break
+		}
+	}
+
+	// Load JSON config file (lowest priority)
+	if err = c.loadConfigFile(configPath); err != nil {
+		log.Fatal().Err(err).Msg("Failed to load config file")
+	}
+
+	// Parse flags (medium priority - overrides JSON)
 	flag.Parse()
+
+	// Environment variables (highest priority - overrides flags and JSON)
 
 	if serverAddr := os.Getenv("SERVER_ADDRESS"); serverAddr != "" {
 		if _, err = strconv.Unquote("\"" + serverAddr + "\""); err != nil {
@@ -196,6 +232,87 @@ func (c *Config) InitConfig() {
 			log.Fatal().Err(err).Msg("cannot parse audit enabled environment variable")
 		}
 	}
+
+	if httpsEnabled := os.Getenv("ENABLE_HTTPS"); httpsEnabled != "" {
+		c.HTTPS, err = strconv.ParseBool(httpsEnabled)
+		if err != nil {
+			log.Fatal().Err(err).Msg("cannot parse https enabled environment variable")
+		}
+	}
+
+	if tlsCertPath := os.Getenv("TLS_CERT_PATH"); tlsCertPath != "" {
+		c.TLSCertPath = tlsCertPath
+	}
+
+	if tlsKeyPath := os.Getenv("TLS_KEY_PATH"); tlsKeyPath != "" {
+		c.TLSKeyPath = tlsKeyPath
+	}
+
+	if configPath := os.Getenv("CONFIG"); configPath != "" {
+		c.ConfigPath = configPath
+	}
+}
+
+// helper functions for loadConfigFile
+func mergeStr(dst *string, src string) {
+	if src != "" {
+		*dst = src
+	}
+}
+
+func mergeBool(dst *bool, src bool) {
+	if src {
+		*dst = src
+	}
+}
+
+func mergeDuration(dst *time.Duration, src time.Duration) {
+	if src != 0 {
+		*dst = src
+	}
+}
+
+// loadConfigFile loads configuration from JSON file into the Config struct.
+// Returns error only for JSON parsing issues, not for missing files.
+func (c *Config) loadConfigFile(path string) error {
+	if path == "" {
+		return nil
+	}
+
+	file, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	var fc Config
+	if err = json.Unmarshal(file, &fc); err != nil {
+		return fmt.Errorf("failed to parse config file: %w", err)
+	}
+
+	mergeStr(&c.LocalServerAddr, fc.LocalServerAddr)
+	mergeStr(&c.FilePath.FilePath, fc.FilePath.FilePath)
+	mergeStr(&c.PostgresDSN.DatabaseDSN, fc.PostgresDSN.DatabaseDSN)
+	mergeStr(&c.AuthConf.SecretKey, fc.AuthConf.SecretKey)
+	mergeStr(&c.AuditConf.FileConf.AuditFilePath, fc.AuditConf.FileConf.AuditFilePath)
+	mergeStr(&c.AuditConf.RemoteConf.RemoteServerURL, fc.AuditConf.RemoteConf.RemoteServerURL)
+	mergeStr(&c.TLSCertPath, fc.TLSCertPath)
+	mergeStr(&c.TLSKeyPath, fc.TLSKeyPath)
+
+	mergeBool(&c.HTTPS, fc.HTTPS)
+	mergeDuration(&c.AuthConf.TokenExpiration, fc.AuthConf.TokenExpiration)
+
+	if fc.ShortURLTemplate != "" {
+		c.ShortURLTemplate = fc.ShortURLTemplate
+	}
+
+	if fc.LogLevel.Level != zerolog.NoLevel {
+		c.LogLevel = fc.LogLevel
+	}
+
+	return nil
 }
 
 // CheckPostgresConnection validates the connection to PostgreSQL database
@@ -226,4 +343,16 @@ func (c *Config) GetShortURLTemplate() string {
 // GetLogLevel returns logging level. Used in logger.NewLogger constructor.
 func (c *Config) GetLogLevel() zerolog.Level {
 	return c.LogLevel.Level
+}
+
+func (c *Config) GetHTTPS() bool {
+	return c.HTTPS
+}
+
+func (c *Config) GetTLSCertPath() string {
+	return c.TLSCertPath
+}
+
+func (c *Config) GetTLSKeyPath() string {
+	return c.TLSKeyPath
 }

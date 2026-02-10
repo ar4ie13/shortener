@@ -20,9 +20,18 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// PgxPool defines the interface for pgxpool operations used by DB
+type PgxPool interface {
+	Close()
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults
+}
+
 // DB is a main postgres repository object
 type DB struct {
-	pool *pgxpool.Pool
+	pool PgxPool
 	zlog zerolog.Logger
 }
 
