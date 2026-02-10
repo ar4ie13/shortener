@@ -77,9 +77,7 @@ func NewHandler(s Service, c Config, a Auth, o Auditor, zlog zerolog.Logger) *Ha
 	return &Handler{s, c, a, o, zlog}
 }
 
-// ListenAndServe starts web server with specified chi router
-func (h Handler) ListenAndServe() error {
-
+func (h Handler) RegisterRoutes() *chi.Mux {
 	router := chi.NewRouter()
 
 	// adding pprof to /debug
@@ -107,9 +105,15 @@ func (h Handler) ListenAndServe() error {
 			})
 		})
 	})
+	return router
+}
+
+// ListenAndServe starts web server with specified chi router
+func (h Handler) ListenAndServe() error {
+
 	srv := &http.Server{
 		Addr:    h.cfg.GetLocalServerAddr(),
-		Handler: router,
+		Handler: h.RegisterRoutes(),
 	}
 
 	// Graceful shutdown

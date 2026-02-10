@@ -49,20 +49,6 @@ type Config struct {
 	ConfigPath       string              `json:"config_path,omitempty"`
 }
 
-type ConfigTest struct {
-	LocalServerAddr  string              `json:"local_server_addr,omitempty"`
-	ShortURLTemplate ShortURLTemplate    `json:"short_url_template,omitempty"`
-	LogLevel         LogLevel            `json:"log_level,omitempty"`
-	FilePath         fileconf.Config     `json:"file_config,omitempty"`
-	PostgresDSN      pgconf.Config       `json:"postgres_config,omitempty"`
-	AuthConf         authconf.Config     `json:"auth_config,omitempty"`
-	AuditConf        auditconf.AuditConf `json:"audit_config,omitempty"`
-	HTTPS            bool                `json:"https_enabled,omitempty"`
-	TLSCertPath      string              `json:"tls_cert_path,omitempty"`
-	TLSKeyPath       string              `json:"tls_key_path,omitempty"`
-	ConfigPath       string              `json:"config_path,omitempty"`
-}
-
 // NewConfig constructor for Config
 func NewConfig() *Config {
 	c := &Config{}
@@ -267,6 +253,25 @@ func (c *Config) InitConfig() {
 	}
 }
 
+// helper functions for loadConfigFile
+func mergeStr(dst *string, src string) {
+	if src != "" {
+		*dst = src
+	}
+}
+
+func mergeBool(dst *bool, src bool) {
+	if src {
+		*dst = src
+	}
+}
+
+func mergeDuration(dst *time.Duration, src time.Duration) {
+	if src != 0 {
+		*dst = src
+	}
+}
+
 // loadConfigFile loads configuration from JSON file into the Config struct.
 // Returns error only for JSON parsing issues, not for missing files.
 func (c *Config) loadConfigFile(path string) error {
@@ -282,47 +287,29 @@ func (c *Config) loadConfigFile(path string) error {
 		return fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	var fileConfig Config
-	if err = json.Unmarshal(file, &fileConfig); err != nil {
+	var fc Config
+	if err = json.Unmarshal(file, &fc); err != nil {
 		return fmt.Errorf("failed to parse config file: %w", err)
 	}
 
-	// Apply non-zero values from file
-	if fileConfig.LocalServerAddr != "" {
-		c.LocalServerAddr = fileConfig.LocalServerAddr
+	mergeStr(&c.LocalServerAddr, fc.LocalServerAddr)
+	mergeStr(&c.FilePath.FilePath, fc.FilePath.FilePath)
+	mergeStr(&c.PostgresDSN.DatabaseDSN, fc.PostgresDSN.DatabaseDSN)
+	mergeStr(&c.AuthConf.SecretKey, fc.AuthConf.SecretKey)
+	mergeStr(&c.AuditConf.FileConf.AuditFilePath, fc.AuditConf.FileConf.AuditFilePath)
+	mergeStr(&c.AuditConf.RemoteConf.RemoteServerURL, fc.AuditConf.RemoteConf.RemoteServerURL)
+	mergeStr(&c.TLSCertPath, fc.TLSCertPath)
+	mergeStr(&c.TLSKeyPath, fc.TLSKeyPath)
+
+	mergeBool(&c.HTTPS, fc.HTTPS)
+	mergeDuration(&c.AuthConf.TokenExpiration, fc.AuthConf.TokenExpiration)
+
+	if fc.ShortURLTemplate != "" {
+		c.ShortURLTemplate = fc.ShortURLTemplate
 	}
-	if fileConfig.ShortURLTemplate != "" {
-		c.ShortURLTemplate = fileConfig.ShortURLTemplate
-	}
-	if fileConfig.LogLevel.Level != zerolog.NoLevel {
-		c.LogLevel = fileConfig.LogLevel
-	}
-	if fileConfig.FilePath.FilePath != "" {
-		c.FilePath = fileConfig.FilePath
-	}
-	if fileConfig.PostgresDSN.DatabaseDSN != "" {
-		c.PostgresDSN = fileConfig.PostgresDSN
-	}
-	if fileConfig.AuthConf.SecretKey != "" {
-		c.AuthConf.SecretKey = fileConfig.AuthConf.SecretKey
-	}
-	if fileConfig.AuthConf.TokenExpiration != 0 {
-		c.AuthConf.TokenExpiration = fileConfig.AuthConf.TokenExpiration
-	}
-	if fileConfig.AuditConf.FileConf.AuditFilePath != "" {
-		c.AuditConf.FileConf.AuditFilePath = fileConfig.AuditConf.FileConf.AuditFilePath
-	}
-	if fileConfig.AuditConf.RemoteConf.RemoteServerURL != "" {
-		c.AuditConf.RemoteConf.RemoteServerURL = fileConfig.AuditConf.RemoteConf.RemoteServerURL
-	}
-	if fileConfig.HTTPS {
-		c.HTTPS = fileConfig.HTTPS
-	}
-	if fileConfig.TLSCertPath != "" {
-		c.TLSCertPath = fileConfig.TLSCertPath
-	}
-	if fileConfig.TLSKeyPath != "" {
-		c.TLSKeyPath = fileConfig.TLSKeyPath
+
+	if fc.LogLevel.Level != zerolog.NoLevel {
+		c.LogLevel = fc.LogLevel
 	}
 
 	return nil
