@@ -58,6 +58,10 @@ func (m mockService) GetUserShortURLs(_ context.Context, _ uuid.UUID) (map[strin
 
 func (m mockService) SendShortURLForDelete(_ context.Context, _ uuid.UUID, _ []string) {}
 
+func (m mockService) GetStats(_ context.Context) (int, int, error) {
+	return 10, 5, nil
+}
+
 type mockAuth struct{}
 
 func (m mockAuth) GenerateUserUUID() uuid.UUID {
@@ -94,6 +98,9 @@ func (m mockConfig) GetTLSCertPath() string {
 }
 func (m mockConfig) GetTLSKeyPath() string {
 	return ""
+}
+func (m mockConfig) GetTrustedSubnet() string {
+	return "192.168.31.0/24"
 }
 
 // --- Helper to create test server with a known user context ---

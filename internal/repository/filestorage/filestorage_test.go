@@ -172,6 +172,35 @@ func TestFileStorage_GetUserShortURLs(t *testing.T) {
 	assert.ErrorIs(t, err, myerrors.ErrNotFound)
 }
 
+func TestFileStorage_GetStats(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "stats_test.jsonl")
+
+	fs := NewFileStorage(fileconf.Config{FilePath: filePath}, zerolog.Nop())
+	ctx := context.Background()
+
+	t.Run("empty storage", func(t *testing.T) {
+		urls, users, err := fs.GetStats(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, urls)
+		assert.Equal(t, 0, users)
+	})
+
+	t.Run("with data", func(t *testing.T) {
+		user1 := uuid.New()
+		user2 := uuid.New()
+
+		fs.Save(ctx, user1, "s1", "https://one.com")
+		fs.Save(ctx, user1, "s2", "https://two.com")
+		fs.Save(ctx, user2, "s3", "https://three.com")
+
+		urls, users, err := fs.GetStats(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, 3, urls)
+		assert.Equal(t, 2, users)
+	})
+}
+
 func TestFileStorage_DeleteUserShortURLs(t *testing.T) {
 	tmpDir := t.TempDir()
 	filePath := filepath.Join(tmpDir, "delete_test.jsonl")
