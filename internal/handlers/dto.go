@@ -31,3 +31,9 @@ type UserShortURLs struct {
 	ShortURL string `json:"short_url"`
 	LongURL  string `json:"original_url"`
 }
+
+// Stats used for responding to number of slugs and users requests
+type Stats struct {
+	URLs  int `json:"urls"`
+	Users int `json:"users"`
+}

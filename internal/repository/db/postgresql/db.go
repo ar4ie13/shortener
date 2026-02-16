@@ -27,6 +27,7 @@ type PgxPool interface {
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
 	SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults
+	Begin(ctx context.Context) (pgx.Tx, error)
 }
 
 // DB is a main postgres repository object
@@ -242,18 +243,18 @@ func (db *DB) DeleteUserShortURLs(ctx context.Context, shortURLsToDelete map[uui
 	}
 
 	const query = `UPDATE urls SET is_deleted = true WHERE short_url = @shortURL AND user_uuid = @userUUID`
-	insertBatch := &pgx.Batch{}
+	updateBatch := &pgx.Batch{}
 	for k, v := range shortURLsToDelete {
 		for i := range v {
 			args := pgx.NamedArgs{
 				"userUUID": k,
 				"shortURL": v[i],
 			}
-			insertBatch.Queue(query, args)
+			updateBatch.Queue(query, args)
 		}
 	}
 
-	results := db.pool.SendBatch(ctx, insertBatch)
+	results := db.pool.SendBatch(ctx, updateBatch)
 	defer results.Close()
 
 	for range shortURLsToDelete {
@@ -264,4 +265,51 @@ func (db *DB) DeleteUserShortURLs(ctx context.Context, shortURLsToDelete map[uui
 	}
 
 	return results.Close()
+}
+
+// GetStats used to retrieve number of slugs and users in the service
+func (db *DB) GetStats(ctx context.Context) (urls int, users int, err error) {
+
+	const (
+		querySlugsStmt = `SELECT COUNT (DISTINCT user_uuid) FROM urls`
+		queryUsersStmt = `SELECT COUNT (short_url) FROM urls`
+	)
+
+	tx, err := db.pool.Begin(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	defer tx.Rollback(ctx)
+
+	rowURLs := tx.QueryRow(ctx, querySlugsStmt)
+
+	err = rowURLs.Scan(&urls)
+	if err != nil {
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			return 0, 0, myerrors.ErrNotFound
+		default:
+			return 0, 0, fmt.Errorf("failed to scan a response row: %w", err)
+		}
+	}
+
+	rowUsers := tx.QueryRow(ctx, queryUsersStmt)
+
+	err = rowUsers.Scan(&users)
+	if err != nil {
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			return 0, 0, myerrors.ErrNotFound
+		default:
+			return 0, 0, fmt.Errorf("failed to scan a response row: %w", err)
+		}
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return urls, users, err
 }

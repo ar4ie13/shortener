@@ -259,3 +259,9 @@ func (fs *FileStorage) DeleteUserShortURLs(ctx context.Context, shortURLsToDelet
 
 	return nil
 }
+
+// GetStats used to retrieve number of slugs and users in the service
+func (fs *FileStorage) GetStats(ctx context.Context) (urls int, users int, err error) {
+	urls, users, err = fs.m.GetStats(ctx)
+	return urls, users, err
+}

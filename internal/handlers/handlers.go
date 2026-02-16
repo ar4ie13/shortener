@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -39,6 +40,7 @@ type Service interface {
 	SaveBatch(ctx context.Context, userUUID uuid.UUID, batch []model.URL) ([]model.URL, error)
 	GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[string]string, error)
 	SendShortURLForDelete(ctx context.Context, userUUID uuid.UUID, shortURLs []string)
+	GetStats(ctx context.Context) (urls int, users int, err error)
 }
 
 // Auth used for authentication
@@ -61,6 +63,7 @@ type Config interface {
 	GetHTTPS() bool
 	GetTLSCertPath() string
 	GetTLSKeyPath() string
+	GetTrustedSubnet() string
 }
 
 // Handler is a main object for package handlers
@@ -83,6 +86,13 @@ func (h Handler) RegisterRoutes() *chi.Mux {
 	// adding pprof to /debug
 	router.Group(func(router chi.Router) {
 		router.Mount("/debug", middleware.Profiler())
+	})
+
+	// admin route group for /api/internal/stats from trusted subnet
+	router.Group(func(router chi.Router) {
+		router.Use(h.requestLogger)
+		router.Use(h.cidrMiddleware)
+		router.Get("/api/internal/stats", h.GetStats)
 	})
 
 	// main routes
@@ -175,6 +185,33 @@ func (h Handler) getStatusCode(err error) int {
 	}
 
 	return http.StatusInternalServerError
+}
+
+// GetStats gets number of shortened URLs and number of users in service
+func (h Handler) GetStats(w http.ResponseWriter, r *http.Request) {
+	urls, users, err := h.service.GetStats(r.Context())
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	if err != nil {
+		statusCode := h.getStatusCode(err)
+		http.Error(w, err.Error(), statusCode)
+		return
+	}
+	resp := Stats{
+		URLs:  urls,
+		Users: users,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	enc := json.NewEncoder(w)
+	if err = enc.Encode(resp); err != nil {
+		h.zlog.Debug().Msgf("error encoding response: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 // PostURL handles POST requests from clients and receives URL from body to store it in the Repository via Service
