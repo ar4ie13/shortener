@@ -45,7 +45,7 @@ func (h Handler) authorizationInterceptor(ctx context.Context, req interface{}, 
 	}
 
 	// Store user_id in context for handlers to use
-	ctx = context.WithValue(ctx, "user_id", userUUID.String())
+	ctx = context.WithValue(ctx, UserUUIDKey, userUUID.String())
 
 	// Send user_id back to client in response headers for session persistence
 	header := metadata.Pairs("user_id", userUUID.String())
@@ -57,7 +57,7 @@ func (h Handler) authorizationInterceptor(ctx context.Context, req interface{}, 
 
 // getUserUUIDFromGRPCRequest gets userUUID from gRPC request
 func (h Handler) getUserUUIDFromGRPCRequest(ctx context.Context) (uuid.UUID, error) {
-	userIDValue := ctx.Value("user_id")
+	userIDValue := ctx.Value(UserUUIDKey)
 	if userIDValue == nil {
 		h.zlog.Debug().Msg("user_id not found in context")
 		return uuid.Nil, status.Error(codes.Unauthenticated, "user_id not found in context")

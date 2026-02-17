@@ -84,16 +84,16 @@ func (m *mockGRPCAuth) ValidateUserUUID(token string) (uuid.UUID, error) {
 
 type mockGRPCConfig struct{}
 
-func (m mockGRPCConfig) GetLocalServerAddr() string      { return ":8080" }
-func (m mockGRPCConfig) GetShortURLTemplate() string     { return "http://localhost:8080" }
-func (m mockGRPCConfig) GetLogLevel() zerolog.Level      { return zerolog.InfoLevel }
+func (m mockGRPCConfig) GetLocalServerAddr() string                      { return ":8080" }
+func (m mockGRPCConfig) GetShortURLTemplate() string                     { return "http://localhost:8080" }
+func (m mockGRPCConfig) GetLogLevel() zerolog.Level                      { return zerolog.InfoLevel }
 func (m mockGRPCConfig) CheckPostgresConnection(_ context.Context) error { return nil }
-func (m mockGRPCConfig) GetHTTPS() bool                  { return false }
-func (m mockGRPCConfig) GetTLSCertPath() string          { return "" }
-func (m mockGRPCConfig) GetTLSKeyPath() string           { return "" }
-func (m mockGRPCConfig) GetTrustedSubnet() string        { return "192.168.31.0/24" }
-func (m mockGRPCConfig) GetGRPCServerAddr() string       { return "localhost:8081" }
-func (m mockGRPCConfig) GetGRPCEnabled() bool            { return true }
+func (m mockGRPCConfig) GetHTTPS() bool                                  { return false }
+func (m mockGRPCConfig) GetTLSCertPath() string                          { return "" }
+func (m mockGRPCConfig) GetTLSKeyPath() string                           { return "" }
+func (m mockGRPCConfig) GetTrustedSubnet() string                        { return "192.168.31.0/24" }
+func (m mockGRPCConfig) GetGRPCServerAddr() string                       { return "localhost:8081" }
+func (m mockGRPCConfig) GetGRPCEnabled() bool                            { return true }
 
 type mockGRPCAuditor struct{}
 
@@ -119,7 +119,7 @@ func TestAuthorizationInterceptor_NoToken(t *testing.T) {
 	mockHandler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		called = true
 		// Verify user_id was set in context
-		userID := ctx.Value("user_id")
+		userID := ctx.Value(UserUUIDKey)
 		assert.NotNil(t, userID)
 		return "success", nil
 	}
@@ -142,7 +142,7 @@ func TestAuthorizationInterceptor_ValidToken(t *testing.T) {
 	called := false
 	mockHandler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		called = true
-		userID := ctx.Value("user_id")
+		userID := ctx.Value(UserUUIDKey)
 		assert.NotNil(t, userID)
 		return "success", nil
 	}
@@ -182,7 +182,7 @@ func TestGetUserUUIDFromGRPCRequest_Valid(t *testing.T) {
 	handler := newTestGRPCHandler()
 	expectedUUID := uuid.MustParse("12345678-1234-1234-1234-123456789abc")
 
-	ctx := context.WithValue(context.Background(), "user_id", expectedUUID.String())
+	ctx := context.WithValue(context.Background(), UserUUIDKey, expectedUUID.String())
 
 	userUUID, err := handler.getUserUUIDFromGRPCRequest(ctx)
 
@@ -208,7 +208,7 @@ func TestGetUserUUIDFromGRPCRequest_Missing(t *testing.T) {
 // Test getUserUUIDFromGRPCRequest with invalid type
 func TestGetUserUUIDFromGRPCRequest_InvalidType(t *testing.T) {
 	handler := newTestGRPCHandler()
-	ctx := context.WithValue(context.Background(), "user_id", 12345) // wrong type
+	ctx := context.WithValue(context.Background(), UserUUIDKey, 12345) // wrong type
 
 	userUUID, err := handler.getUserUUIDFromGRPCRequest(ctx)
 
@@ -223,7 +223,7 @@ func TestGetUserUUIDFromGRPCRequest_InvalidType(t *testing.T) {
 // Test getUserUUIDFromGRPCRequest with invalid UUID format
 func TestGetUserUUIDFromGRPCRequest_InvalidFormat(t *testing.T) {
 	handler := newTestGRPCHandler()
-	ctx := context.WithValue(context.Background(), "user_id", "not-a-uuid")
+	ctx := context.WithValue(context.Background(), UserUUIDKey, "not-a-uuid")
 
 	userUUID, err := handler.getUserUUIDFromGRPCRequest(ctx)
 
@@ -239,7 +239,7 @@ func TestGetUserUUIDFromGRPCRequest_InvalidFormat(t *testing.T) {
 func TestShortenURL_Success(t *testing.T) {
 	handler := newTestGRPCHandler()
 	userUUID := uuid.MustParse("12345678-1234-1234-1234-123456789abc")
-	ctx := context.WithValue(context.Background(), "user_id", userUUID.String())
+	ctx := context.WithValue(context.Background(), UserUUIDKey, userUUID.String())
 
 	req := &pb.URLShortenRequest{}
 	req.SetUrl("https://example.com")
@@ -273,7 +273,7 @@ func TestShortenURL_NoUserID(t *testing.T) {
 func TestExpandURL_Success(t *testing.T) {
 	handler := newTestGRPCHandler()
 	userUUID := uuid.MustParse("12345678-1234-1234-1234-123456789abc")
-	ctx := context.WithValue(context.Background(), "user_id", userUUID.String())
+	ctx := context.WithValue(context.Background(), UserUUIDKey, userUUID.String())
 
 	req := &pb.URLExpandRequest{}
 	req.SetId("abc123")
@@ -289,7 +289,7 @@ func TestExpandURL_Success(t *testing.T) {
 func TestExpandURL_NotFound(t *testing.T) {
 	handler := newTestGRPCHandler()
 	userUUID := uuid.MustParse("12345678-1234-1234-1234-123456789abc")
-	ctx := context.WithValue(context.Background(), "user_id", userUUID.String())
+	ctx := context.WithValue(context.Background(), UserUUIDKey, userUUID.String())
 
 	req := &pb.URLExpandRequest{}
 	req.SetId("nonexistent")
@@ -326,7 +326,7 @@ func TestExpandURL_NoUserID(t *testing.T) {
 func TestListUserURLs_Success(t *testing.T) {
 	handler := newTestGRPCHandler()
 	userUUID := uuid.MustParse("12345678-1234-1234-1234-123456789abc")
-	ctx := context.WithValue(context.Background(), "user_id", userUUID.String())
+	ctx := context.WithValue(context.Background(), UserUUIDKey, userUUID.String())
 
 	resp, err := handler.ListUserURLs(ctx, &emptypb.Empty{})
 
