@@ -30,7 +30,7 @@ func (h Handler) authorizationInterceptor(ctx context.Context, req interface{}, 
 	if tokenString == "" {
 		// If no token - creating new userUUID and JWT token
 		userUUID = h.auth.GenerateUserUUID()
-		tokenString, err = h.auth.BuildJWTString(userUUID)
+		_, err = h.auth.BuildJWTString(userUUID)
 		if err != nil {
 			h.zlog.Error().Msgf("Error building JWT string: %v", err)
 			return nil, status.Errorf(codes.Internal, "Error building JWT string: %v", err)
