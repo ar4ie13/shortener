@@ -44,7 +44,7 @@ func run() error {
 	audit := auditor.NewAuditor(cfg.AuditConf, zlog.Logger)
 	hdlr := handlers.NewHandler(srv, cfg, authorize, audit, zlog.Logger)
 
-	if err = hdlr.ListenAndServe(); err != nil {
+	if err = hdlr.StartServer(); err != nil {
 		return fmt.Errorf("HTTP server ListenAndServe: %v", err)
 	}
 

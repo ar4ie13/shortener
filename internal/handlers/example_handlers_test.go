@@ -102,6 +102,12 @@ func (m mockConfig) GetTLSKeyPath() string {
 func (m mockConfig) GetTrustedSubnet() string {
 	return "192.168.31.0/24"
 }
+func (m mockConfig) GetGRPCServerAddr() string {
+	return "localhost:8081"
+}
+func (m mockConfig) GetGRPCEnabled() bool {
+	return false
+}
 
 // --- Helper to create test server with a known user context ---
 

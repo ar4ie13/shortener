@@ -48,6 +48,8 @@ type Config struct {
 	TLSKeyPath       string              `json:"tls_key_path,omitempty"`
 	ConfigPath       string              `json:"config_path,omitempty"`
 	TrustedSubnet    string              `json:"trusted_subnet,omitempty"`
+	GRPCServerAddr   string              `json:"grpc_server_addr,omitempty"`
+	GRPCEnabled      bool                `json:"grpc_enabled,omitempty"`
 }
 
 // NewConfig constructor for Config
@@ -126,6 +128,7 @@ func (c *Config) InitConfig() {
 	defaultTLSKey := ""
 	defaultConfigPath := ""
 	defaultTrustedSubnet := "192.168.31.0/24"
+	defaultGRPCServerAddr := "localhost:8081"
 
 	flag.StringVar(&c.LocalServerAddr, "a", defaultServerAddr, "local server address")
 	flag.Var(&c.ShortURLTemplate, "b", "short url template")
@@ -142,6 +145,8 @@ func (c *Config) InitConfig() {
 	flag.StringVar(&c.TLSKeyPath, "tls-key", defaultTLSKey, "TLS key")
 	flag.StringVar(&c.ConfigPath, "c", defaultConfigPath, "config file path")
 	flag.StringVar(&c.TrustedSubnet, "t", defaultTrustedSubnet, "trusted subnet")
+	flag.StringVar(&c.GRPCServerAddr, "grpc-addr", defaultGRPCServerAddr, "gRPC server address")
+	flag.BoolVar(&c.GRPCEnabled, "grpc", true, "gRPC enabled")
 
 	if err = c.ShortURLTemplate.Set(defaultURL); err != nil {
 		log.Fatal().Err(err).Msg("Failed to set default URL")
@@ -260,6 +265,22 @@ func (c *Config) InitConfig() {
 	if _, _, err = net.ParseCIDR(c.TrustedSubnet); err != nil {
 		log.Fatal().Err(err).Msg("cannot parse Trusted Subnet")
 	}
+
+	if grpc := os.Getenv("GRPC"); grpc != "" {
+		c.GRPCEnabled, err = strconv.ParseBool(grpc)
+		if err != nil {
+			log.Fatal().Err(err).Msg("cannot parse grpc enabled environment variable")
+		}
+	}
+	if grpcAddr := os.Getenv("GRPC_ADDR"); grpcAddr != "" {
+		if _, err = strconv.Unquote("\"" + grpcAddr + "\""); err != nil {
+			parts := strings.SplitN(grpcAddr, ":", 2)
+			if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+				log.Fatal().Err(err).Msg("Failed to set grpc address from GRPC_ADDR")
+			}
+		}
+		c.GRPCServerAddr = grpcAddr
+	}
 }
 
 // helper functions for loadConfigFile
@@ -310,8 +331,10 @@ func (c *Config) loadConfigFile(path string) error {
 	mergeStr(&c.TLSCertPath, fc.TLSCertPath)
 	mergeStr(&c.TLSKeyPath, fc.TLSKeyPath)
 	mergeStr(&c.TrustedSubnet, fc.TrustedSubnet)
+	mergeStr(&c.GRPCServerAddr, fc.GRPCServerAddr)
 
 	mergeBool(&c.HTTPS, fc.HTTPS)
+	mergeBool(&c.GRPCEnabled, fc.GRPCEnabled)
 	mergeDuration(&c.AuthConf.TokenExpiration, fc.AuthConf.TokenExpiration)
 
 	if fc.ShortURLTemplate != "" {
@@ -369,4 +392,12 @@ func (c *Config) GetTLSKeyPath() string {
 
 func (c *Config) GetTrustedSubnet() string {
 	return c.TrustedSubnet
+}
+
+func (c *Config) GetGRPCServerAddr() string {
+	return c.GRPCServerAddr
+}
+
+func (c *Config) GetGRPCEnabled() bool {
+	return c.GRPCEnabled
 }
