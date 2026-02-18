@@ -7,6 +7,7 @@
 
 # Test client
 cmd/client
+cmd/grpstest
 
 # Test binary, built with `go test -c`
 *.test
@@ -38,3 +39,6 @@ config.json
 
 # linters configs
 staticcheck.conf
+
+# .gitignore
+.gitignore

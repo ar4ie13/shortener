@@ -32,6 +32,7 @@ type Repository interface {
 	SaveBatch(ctx context.Context, userUUID uuid.UUID, batch []model.URL) error
 	GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[string]string, error)
 	DeleteUserShortURLs(ctx context.Context, shortURLsToDelete map[uuid.UUID][]string) error
+	GetStats(ctx context.Context) (urls int, users int, err error)
 }
 
 // Service is a main object of the package that implements Repository interface
@@ -249,4 +250,12 @@ func (s *Service) deleteShortURLs() {
 			shortURLsForDelete = make(map[uuid.UUID][]string)
 		}
 	}
+}
+
+func (s *Service) GetStats(ctx context.Context) (urls int, users int, err error) {
+	urls, users, err = s.repo.GetStats(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	return urls, users, nil
 }

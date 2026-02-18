@@ -49,6 +49,11 @@ func (m *MockRepository) DeleteUserShortURLs(ctx context.Context, shortURLsToDel
 	return args.Error(0)
 }
 
+func (m *MockRepository) GetStats(ctx context.Context) (int, int, error) {
+	args := m.Called(ctx)
+	return args.Int(0), args.Int(1), args.Error(2)
+}
+
 func TestNewService(t *testing.T) {
 	logger := zerolog.Nop()
 	mockRepo := &MockRepository{}
@@ -580,6 +585,68 @@ func TestService_DeleteFunctionality(t *testing.T) {
 	// Verify that a channel was added to the slice
 	channel := service.toDeleteChan[0]
 	assert.NotNil(t, channel)
+}
+
+func TestService_GetStats(t *testing.T) {
+	tests := []struct {
+		name          string
+		mockURLs      int
+		mockUsers     int
+		mockError     error
+		expectedURLs  int
+		expectedUsers int
+		expectedError bool
+	}{
+		{
+			name:          "successful retrieval",
+			mockURLs:      10,
+			mockUsers:     5,
+			mockError:     nil,
+			expectedURLs:  10,
+			expectedUsers: 5,
+		},
+		{
+			name:          "zero stats",
+			mockURLs:      0,
+			mockUsers:     0,
+			mockError:     nil,
+			expectedURLs:  0,
+			expectedUsers: 0,
+		},
+		{
+			name:          "repository returns error",
+			mockURLs:      0,
+			mockUsers:     0,
+			mockError:     errors.New("db error"),
+			expectedURLs:  0,
+			expectedUsers: 0,
+			expectedError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := &MockRepository{}
+			logger := zerolog.Nop()
+			service := &Service{repo: mockRepo, zlog: logger}
+
+			mockRepo.On("GetStats", mock.Anything).Return(tt.mockURLs, tt.mockUsers, tt.mockError)
+
+			urls, users, err := service.GetStats(context.Background())
+
+			if tt.expectedError {
+				assert.Error(t, err)
+				assert.Equal(t, 0, urls)
+				assert.Equal(t, 0, users)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedURLs, urls)
+				assert.Equal(t, tt.expectedUsers, users)
+			}
+
+			mockRepo.AssertExpectations(t)
+		})
+	}
 }
 
 func Benchmark_Service_generateShortURL(b *testing.B) {

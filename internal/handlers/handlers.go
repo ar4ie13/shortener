@@ -8,11 +8,9 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 
+	pb "github.com/ar4ie13/shortener/api/proto"
 	"github.com/ar4ie13/shortener/internal/model"
 	"github.com/ar4ie13/shortener/internal/myerrors"
 	"github.com/go-chi/chi/v5"
@@ -39,6 +37,7 @@ type Service interface {
 	SaveBatch(ctx context.Context, userUUID uuid.UUID, batch []model.URL) ([]model.URL, error)
 	GetUserShortURLs(ctx context.Context, userUUID uuid.UUID) (map[string]string, error)
 	SendShortURLForDelete(ctx context.Context, userUUID uuid.UUID, shortURLs []string)
+	GetStats(ctx context.Context) (urls int, users int, err error)
 }
 
 // Auth used for authentication
@@ -61,10 +60,14 @@ type Config interface {
 	GetHTTPS() bool
 	GetTLSCertPath() string
 	GetTLSKeyPath() string
+	GetTrustedSubnet() string
+	GetGRPCServerAddr() string
+	GetGRPCEnabled() bool
 }
 
 // Handler is a main object for package handlers
 type Handler struct {
+	pb.UnimplementedShortenerServiceServer
 	service  Service
 	cfg      Config
 	auth     Auth
@@ -74,7 +77,13 @@ type Handler struct {
 
 // NewHandler constructs Handler object
 func NewHandler(s Service, c Config, a Auth, o Auditor, zlog zerolog.Logger) *Handler {
-	return &Handler{s, c, a, o, zlog}
+	return &Handler{
+		service:  s,
+		cfg:      c,
+		auth:     a,
+		observer: o,
+		zlog:     zlog,
+	}
 }
 
 func (h Handler) RegisterRoutes() *chi.Mux {
@@ -83,6 +92,13 @@ func (h Handler) RegisterRoutes() *chi.Mux {
 	// adding pprof to /debug
 	router.Group(func(router chi.Router) {
 		router.Mount("/debug", middleware.Profiler())
+	})
+
+	// admin route group for /api/internal/stats from trusted subnet
+	router.Group(func(router chi.Router) {
+		router.Use(h.requestLogger)
+		router.Use(h.cidrMiddleware)
+		router.Get("/api/internal/stats", h.GetStats)
 	})
 
 	// main routes
@@ -106,47 +122,6 @@ func (h Handler) RegisterRoutes() *chi.Mux {
 		})
 	})
 	return router
-}
-
-// ListenAndServe starts web server with specified chi router
-func (h Handler) ListenAndServe() error {
-
-	srv := &http.Server{
-		Addr:    h.cfg.GetLocalServerAddr(),
-		Handler: h.RegisterRoutes(),
-	}
-
-	// Graceful shutdown
-	idleConnsClosed := make(chan struct{})
-
-	sigint := make(chan os.Signal, 1)
-
-	signal.Notify(sigint, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-
-	go func() {
-		<-sigint
-		if err := srv.Shutdown(context.Background()); err != nil {
-			h.zlog.Printf("HTTP server Shutdown: %v", err)
-		}
-		close(idleConnsClosed)
-	}()
-
-	h.zlog.Info().Msgf("listening on %v\nURL Template: %v\nLog Level: %v", h.cfg.GetLocalServerAddr(), h.cfg.GetShortURLTemplate(), h.cfg.GetLogLevel())
-	switch h.cfg.GetHTTPS() {
-	case true:
-		if err := srv.ListenAndServeTLS(h.cfg.GetTLSCertPath(), h.cfg.GetTLSKeyPath()); !errors.Is(err, http.ErrServerClosed) {
-			return err
-		}
-	default:
-		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			return err
-		}
-
-	}
-	<-idleConnsClosed
-
-	h.zlog.Info().Msgf("shortener server shutdown gracefully")
-	return nil
 }
 
 // getUserUID
@@ -175,6 +150,31 @@ func (h Handler) getStatusCode(err error) int {
 	}
 
 	return http.StatusInternalServerError
+}
+
+// GetStats gets number of shortened URLs and number of users in service
+func (h Handler) GetStats(w http.ResponseWriter, r *http.Request) {
+	urls, users, err := h.service.GetStats(r.Context())
+
+	if err != nil {
+		h.zlog.Err(err).Msgf("cannot get stats for URLs: %v", urls)
+		statusCode := h.getStatusCode(err)
+		http.Error(w, err.Error(), statusCode)
+		return
+	}
+	resp := Stats{
+		URLs:  urls,
+		Users: users,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	enc := json.NewEncoder(w)
+	if err = enc.Encode(resp); err != nil {
+		h.zlog.Debug().Msgf("error encoding response: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 // PostURL handles POST requests from clients and receives URL from body to store it in the Repository via Service
@@ -391,7 +391,7 @@ func (h Handler) PostURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GetUsersShortURL handles get requests and redirects to the URL by provided shortURL if it is found in Repository
+// GetUsersShortURL handles get requests and respond with all user's shortened URLs
 func (h Handler) GetUsersShortURL(w http.ResponseWriter, r *http.Request) {
 	userUUID, err := h.getUserUUIDFromRequest(r)
 	if err != nil {

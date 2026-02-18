@@ -8,6 +8,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"strconv"
@@ -18,7 +19,6 @@ import (
 	authconf "github.com/ar4ie13/shortener/internal/auth/config"
 	pgconf "github.com/ar4ie13/shortener/internal/repository/db/postgresql/config"
 	fileconf "github.com/ar4ie13/shortener/internal/repository/filestorage/config"
-
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -47,6 +47,9 @@ type Config struct {
 	TLSCertPath      string              `json:"tls_cert_path,omitempty"`
 	TLSKeyPath       string              `json:"tls_key_path,omitempty"`
 	ConfigPath       string              `json:"config_path,omitempty"`
+	TrustedSubnet    string              `json:"trusted_subnet,omitempty"`
+	GRPCServerAddr   string              `json:"grpc_server_addr,omitempty"`
+	GRPCEnabled      bool                `json:"grpc_enabled,omitempty"`
 }
 
 // NewConfig constructor for Config
@@ -124,6 +127,8 @@ func (c *Config) InitConfig() {
 	defaultTLSCert := ""
 	defaultTLSKey := ""
 	defaultConfigPath := ""
+	defaultTrustedSubnet := "192.168.31.0/24"
+	defaultGRPCServerAddr := "localhost:8081"
 
 	flag.StringVar(&c.LocalServerAddr, "a", defaultServerAddr, "local server address")
 	flag.Var(&c.ShortURLTemplate, "b", "short url template")
@@ -139,6 +144,9 @@ func (c *Config) InitConfig() {
 	flag.StringVar(&c.TLSCertPath, "tls-cert", defaultTLSCert, "TLS certificate")
 	flag.StringVar(&c.TLSKeyPath, "tls-key", defaultTLSKey, "TLS key")
 	flag.StringVar(&c.ConfigPath, "c", defaultConfigPath, "config file path")
+	flag.StringVar(&c.TrustedSubnet, "t", defaultTrustedSubnet, "trusted subnet")
+	flag.StringVar(&c.GRPCServerAddr, "grpc-addr", defaultGRPCServerAddr, "gRPC server address")
+	flag.BoolVar(&c.GRPCEnabled, "grpc", true, "gRPC enabled")
 
 	if err = c.ShortURLTemplate.Set(defaultURL); err != nil {
 		log.Fatal().Err(err).Msg("Failed to set default URL")
@@ -248,8 +256,30 @@ func (c *Config) InitConfig() {
 		c.TLSKeyPath = tlsKeyPath
 	}
 
-	if configPath := os.Getenv("CONFIG"); configPath != "" {
-		c.ConfigPath = configPath
+	if cidr := os.Getenv("TRUSTED_SUBNET"); cidr != "" {
+		if _, _, err := net.ParseCIDR(cidr); err != nil {
+			log.Fatal().Err(err).Msg("cannot parse Trusted Subnet")
+		}
+		c.TrustedSubnet = cidr
+	}
+	if _, _, err = net.ParseCIDR(c.TrustedSubnet); err != nil {
+		log.Fatal().Err(err).Msg("cannot parse Trusted Subnet")
+	}
+
+	if grpc := os.Getenv("GRPC"); grpc != "" {
+		c.GRPCEnabled, err = strconv.ParseBool(grpc)
+		if err != nil {
+			log.Fatal().Err(err).Msg("cannot parse grpc enabled environment variable")
+		}
+	}
+	if grpcAddr := os.Getenv("GRPC_ADDR"); grpcAddr != "" {
+		if _, err = strconv.Unquote("\"" + grpcAddr + "\""); err != nil {
+			parts := strings.SplitN(grpcAddr, ":", 2)
+			if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+				log.Fatal().Err(err).Msg("Failed to set grpc address from GRPC_ADDR")
+			}
+		}
+		c.GRPCServerAddr = grpcAddr
 	}
 }
 
@@ -300,8 +330,11 @@ func (c *Config) loadConfigFile(path string) error {
 	mergeStr(&c.AuditConf.RemoteConf.RemoteServerURL, fc.AuditConf.RemoteConf.RemoteServerURL)
 	mergeStr(&c.TLSCertPath, fc.TLSCertPath)
 	mergeStr(&c.TLSKeyPath, fc.TLSKeyPath)
+	mergeStr(&c.TrustedSubnet, fc.TrustedSubnet)
+	mergeStr(&c.GRPCServerAddr, fc.GRPCServerAddr)
 
 	mergeBool(&c.HTTPS, fc.HTTPS)
+	mergeBool(&c.GRPCEnabled, fc.GRPCEnabled)
 	mergeDuration(&c.AuthConf.TokenExpiration, fc.AuthConf.TokenExpiration)
 
 	if fc.ShortURLTemplate != "" {
@@ -355,4 +388,16 @@ func (c *Config) GetTLSCertPath() string {
 
 func (c *Config) GetTLSKeyPath() string {
 	return c.TLSKeyPath
+}
+
+func (c *Config) GetTrustedSubnet() string {
+	return c.TrustedSubnet
+}
+
+func (c *Config) GetGRPCServerAddr() string {
+	return c.GRPCServerAddr
+}
+
+func (c *Config) GetGRPCEnabled() bool {
+	return c.GRPCEnabled
 }

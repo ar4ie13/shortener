@@ -195,3 +195,11 @@ func (repo *MemStorage) DeleteUserShortURLs(_ context.Context, shortURLsToDelete
 
 	return nil
 }
+
+// GetStats used to retrieve number of slugs and users in the service
+func (repo *MemStorage) GetStats(_ context.Context) (urls int, users int, err error) {
+	
+	urls = len(repo.SlugMemStore)
+	users = len(repo.UserUUIDSlugMemStore)
+	return urls, users, err
+}
