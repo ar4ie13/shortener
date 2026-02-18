@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -156,11 +155,9 @@ func (h Handler) getStatusCode(err error) int {
 // GetStats gets number of shortened URLs and number of users in service
 func (h Handler) GetStats(w http.ResponseWriter, r *http.Request) {
 	urls, users, err := h.service.GetStats(r.Context())
-	if err != nil {
-		fmt.Println(err)
-	}
 
 	if err != nil {
+		h.zlog.Err(err).Msgf("cannot get stats for URLs: %v", urls)
 		statusCode := h.getStatusCode(err)
 		http.Error(w, err.Error(), statusCode)
 		return

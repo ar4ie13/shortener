@@ -31,8 +31,12 @@ func (h Handler) StartServer() error {
 
 	// HTTP server
 	srv := &http.Server{
-		Addr:    h.cfg.GetLocalServerAddr(),
-		Handler: h.RegisterRoutes(),
+		Addr:              h.cfg.GetLocalServerAddr(),
+		Handler:           h.RegisterRoutes(),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	g.Go(func() error {
